@@ -1,0 +1,135 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Slot {
+  MORNING
+  EVENING
+}
+
+enum AppointmentStatus {
+  WAITING
+  CALLED
+  DONE
+  NO_SHOW
+}
+
+enum DisplayMode {
+  IDLE
+  CALLING
+  OFF
+}
+
+model Service {
+  id            String   @id @default(cuid())
+  nameFr        String
+  nameAr        String
+  descriptionFr String
+  descriptionAr String
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  doctors       Doctor[]
+  appointments  Appointment[]
+}
+
+model Doctor {
+  id              String   @id @default(cuid())
+  serviceId       String
+  service         Service  @relation(fields: [serviceId], references: [id])
+  nameFr          String
+  nameAr          String
+  titleFr         String
+  titleAr         String
+  photoUrl        String?
+  active          Boolean  @default(true)
+  scheduleJson    Json
+  morningCapacity Int      @default(0)
+  eveningCapacity Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  appointments    Appointment[]
+  queueCounters   DoctorQueueCounter[]
+
+  @@index([serviceId])
+}
+
+model Appointment {
+  id               String             @id @default(cuid())
+  appointmentDate  DateTime
+  slot             Slot
+  serviceId        String
+  doctorId         String
+  service          Service            @relation(fields: [serviceId], references: [id])
+  doctor           Doctor             @relation(fields: [doctorId], references: [id])
+  patientName      String
+  patientAge       Int
+  patientPhone     String
+  status           AppointmentStatus  @default(WAITING)
+  doctorQueueNumber Int
+  dailyQueueNumber  Int?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@unique([appointmentDate, doctorId, slot, doctorQueueNumber])
+  @@unique([appointmentDate, dailyQueueNumber])
+  @@index([appointmentDate, slot])
+  @@index([appointmentDate, doctorId, slot, status])
+}
+
+model DoctorQueueCounter {
+  id              String   @id @default(cuid())
+  appointmentDate DateTime
+  doctorId        String
+  slot            Slot
+  lastNumber      Int      @default(0)
+  doctor          Doctor   @relation(fields: [doctorId], references: [id])
+
+  @@unique([appointmentDate, doctorId, slot])
+}
+
+model DailyQueueCounter {
+  id              String   @id @default(cuid())
+  appointmentDate DateTime @unique
+  lastNumber      Int      @default(0)
+}
+
+model DisplayState {
+  id               String      @id
+  mode             DisplayMode @default(IDLE)
+  appointmentId    String?
+  doctorId         String?
+  serviceId        String?
+  shownQueueNumber Int?
+  updatedAt        DateTime    @updatedAt
+}
+
+model AdminUser {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  role         String   @default("ADMIN")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model ClinicVideo {
+  id        String   @id @default(cuid())
+  title     String
+  filename  String
+  mimeType  String
+  sizeBytes Int
+  enabled   Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([enabled, sortOrder])
+}

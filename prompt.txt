@@ -1,0 +1,183 @@
+
+## v0 Prompt — Frontend Only (Next.js App Router)
+
+Build a **frontend-only** bilingual (French default + Arabic RTL) medical clinic website + appointment UI + waiting-room display UI using **Next.js (App Router)** + **TypeScript** + **Tailwind** + **shadcn/ui**.
+
+### IMPORTANT SCOPE
+
+* **Frontend only**: no database, no authentication implementation, no real API.
+* Use a **mock data layer** (local JSON / in-memory arrays) + **mock API functions** to simulate backend calls.
+* All data access must be isolated behind a `src/lib/api/*` layer so it can be swapped later with real endpoints.
+
+---
+
+## BRAND / DESIGN
+
+* Use my uploaded clinic logos (PDF) as the brand assets.
+* Prefer green logo variants on light backgrounds.
+* Tailwind tokens (CSS variables):
+
+  * Primary `#56B893`
+  * Accent `#129E69`
+  * Deep `#079A63`
+  * Mint `#C8E9DC`
+  * Soft bg `#F1F9F6`
+* Medical look: clean, lots of whitespace, accessible contrast, mobile-first.
+
+---
+
+## LANGUAGES (FR + AR)
+
+* French is default.
+* Arabic supports RTL (`dir="rtl"`) and layout mirroring.
+* Provide a language switcher in header.
+* Persist language in `localStorage`.
+* All UI strings must exist in both languages.
+* Service/doctor content must support FR/AR fields.
+
+---
+
+## ROUTES / PAGES
+
+### 1) Public Website `/`
+
+Layout sections in this order:
+
+1. **Top bar**: phone + email (always visible)
+2. **Header**: logo, navigation (Services, Doctors, Appointment, Contact), language switch
+3. **Hero** with CTA “Prendre rendez-vous”
+4. **About the clinic** (with placeholder clinic photo)
+5. **Services**: cards with `name_fr/name_ar` + `description_fr/description_ar`
+6. **Doctors**: grouped by service, doctor cards with `name`, `title_fr/title_ar`, optional photo
+7. **Appointment form** section (see below)
+8. **Contact**: address + embedded map placeholder (lat/lng configurable) + phone/email
+
+Use smooth scrolling for nav anchors.
+
+---
+
+## APPOINTMENT FORM UI (on `/`)
+
+Fields:
+
+* Date (required, cannot be past)
+* Time slot (required): Morning / Evening
+* Service (required)
+* Doctor (optional, filtered by selected service)
+* Patient full name (required)
+* Age (required numeric)
+* Phone number (required)
+* Optional note/description
+
+Validation:
+
+* Inline errors in FR/AR
+* Disable submit while “sending”
+* Prevent double submit
+
+On submit:
+
+* Call `createAppointment()` from your mock API layer.
+* Simulate response containing:
+
+  * `queueNumber` (daily counter behavior mocked)
+  * summary of destination (service + optional doctor)
+* Show a nice confirmation UI (modal or inline card) with queue number + chosen date/slot + destination.
+
+---
+
+## WAITING ROOM DISPLAY (PUBLIC) `/display`
+
+Fullscreen kiosk-style page with 3 states:
+
+* `IDLE`: show clinic logo centered
+* `CALLING`: show very large queue number + destination (service + doctor)
+* `OFF`: show logo + offline message
+
+### Display update strategy (frontend logic only)
+
+Implement polling logic but connect it to mock API:
+
+* Poll only on `/display`
+* Pause polling when the page is hidden; resume when visible
+* Adaptive intervals:
+
+  * `IDLE`: poll every 10s
+  * `CALLING`: poll every 3s
+  * `OFF`: stop polling
+* Change detection:
+
+  * display state includes `updatedAt`
+  * client sends lastUpdatedAt to mock API
+  * mock returns `{changed:false}` when unchanged (simulate 304 behavior)
+
+Use a smooth animated transition when switching from IDLE → CALLING and when the number changes.
+
+Also include a small language toggle (or show both FR + AR destination lines).
+
+---
+
+## ADMIN UI (FRONTEND ONLY) `/admin/*` (NO REAL AUTH)
+
+Build the full admin UI, but authentication is mocked:
+
+* Create a `/admin/login` page with email/password form.
+* On submit, set a fake session flag in localStorage.
+* Protect all `/admin/*` pages with a simple client-side guard (redirect to login if not “logged in”).
+* Include a “Logout” button.
+
+### Admin Pages
+
+1. `/admin/dashboard`
+
+   * Analytics cards (mocked): appointments today, this week, by service, by slot
+   * Current display state preview (IDLE/CALLING/OFF)
+2. `/admin/services`
+
+   * CRUD UI for services (mocked)
+3. `/admin/doctors`
+
+   * CRUD UI for doctors, linked to services (mocked)
+4. `/admin/appointments`
+
+   * Filterable table: date, slot, service, status
+   * Status actions: `WAITING`, `CALLED`, `DONE`, `NO_SHOW` (mocked)
+5. `/admin/waiting-room`
+
+   * Queue control UI (mocked):
+
+     * list today’s queue
+     * “Call next WAITING”
+     * manual select queue number to call
+     * buttons to set display state: `CALLING`, `IDLE`, `OFF`
+   * When admin changes display state, it must affect `/display` via the mock API shared state.
+
+---
+
+## MOCK DATA + API LAYER (CRITICAL)
+
+Create a clean structure:
+
+* `src/lib/mock/data.ts` (seed data for services/doctors/appointments)
+* `src/lib/api/services.ts`
+* `src/lib/api/doctors.ts`
+* `src/lib/api/appointments.ts`
+* `src/lib/api/display.ts`
+
+All pages must call these functions only (never directly manipulate mock arrays in components). This will make swapping to real backend easy later.
+
+Mock functions must simulate network delay and return typed results.
+
+---
+
+## UI / QUALITY
+
+* Use shadcn components (Card, Button, Dialog, Table, Badge, Tabs, etc.)
+* Mobile-first responsive layout
+* Accessible forms and labels
+* Consistent typography and spacing
+* Include a short privacy note under the appointment form (FR/AR)
+
+Deliver a working Next.js frontend project with clean folder structure and no backend dependencies.
+
+---

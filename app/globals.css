@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 150 30% 98%;
+    --foreground: 160 20% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 160 20% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 160 20% 10%;
+    --primary: 155 40% 53%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 155 30% 90%;
+    --secondary-foreground: 160 20% 15%;
+    --muted: 150 15% 93%;
+    --muted-foreground: 160 10% 45%;
+    --accent: 155 80% 35%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 150 15% 88%;
+    --input: 150 15% 88%;
+    --ring: 155 40% 53%;
+    --radius: 0.625rem;
+    --chart-1: 155 40% 53%;
+    --chart-2: 155 80% 35%;
+    --chart-3: 155 90% 32%;
+    --chart-4: 150 30% 75%;
+    --chart-5: 150 15% 60%;
+
+    --clinic-primary: #56B893;
+    --clinic-accent: #129E69;
+    --clinic-deep: #079A63;
+    --clinic-mint: #C8E9DC;
+    --clinic-soft: #F1F9F6;
+  }
+
+  .dark {
+    --background: 160 20% 5%;
+    --foreground: 150 10% 95%;
+    --card: 160 15% 8%;
+    --card-foreground: 150 10% 95%;
+    --popover: 160 15% 8%;
+    --popover-foreground: 150 10% 95%;
+    --primary: 155 40% 53%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 160 15% 15%;
+    --secondary-foreground: 150 10% 90%;
+    --muted: 160 10% 18%;
+    --muted-foreground: 150 10% 60%;
+    --accent: 155 80% 35%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 160 10% 20%;
+    --input: 160 10% 20%;
+    --ring: 155 40% 53%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+[dir="rtl"] {
+  font-family: var(--font-arabic), var(--font-sans), sans-serif;
+}
+
+/* Section separator */
+.section-divider {
+  @apply h-px bg-gradient-to-r from-transparent via-border to-transparent;
+}
