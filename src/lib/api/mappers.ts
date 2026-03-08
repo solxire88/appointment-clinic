@@ -11,11 +11,12 @@ import type {
   AppointmentSlot,
   AvailableDoctor,
   ClinicVideo,
+  DaySlots,
   Doctor,
   Service,
   WeeklySchedule,
 } from "@/src/lib/types"
-import { DEFAULT_SCHEDULE } from "@/src/lib/types"
+import { DEFAULT_SCHEDULE, WEEK_DAYS } from "@/src/lib/types"
 import { formatClinicDateFromIso } from "@/src/lib/utils/clinic-date"
 
 const DEFAULT_ICON = "activity"
@@ -40,6 +41,12 @@ export function mapService(api: ApiService): Service {
 }
 
 export function mapDoctor(api: ApiDoctor): Doctor {
+  const schedule = normalizeWeeklySchedule(
+    api.scheduleJson,
+    api.morningCapacity,
+    api.eveningCapacity
+  )
+
   return {
     id: api.id,
     name_fr: api.nameFr,
@@ -48,10 +55,32 @@ export function mapDoctor(api: ApiDoctor): Doctor {
     title_ar: api.titleAr,
     serviceId: api.serviceId,
     photoUrl: api.photoUrl || undefined,
-    schedule: api.scheduleJson as WeeklySchedule,
+    schedule,
     capacityMorning: api.morningCapacity,
     capacityEvening: api.eveningCapacity,
   }
+}
+
+function normalizeWeeklySchedule(
+  rawSchedule: ApiDoctor["scheduleJson"],
+  fallbackMorning: number,
+  fallbackEvening: number
+): WeeklySchedule {
+  const normalized = {} as WeeklySchedule
+
+  for (const day of WEEK_DAYS) {
+    const rawDay = rawSchedule?.[day]
+    const defaultDay = DEFAULT_SCHEDULE[day]
+    const daySchedule: DaySlots = {
+      morning: rawDay?.morning ?? defaultDay.morning,
+      evening: rawDay?.evening ?? defaultDay.evening,
+      morningCapacity: rawDay?.morningCapacity ?? fallbackMorning ?? defaultDay.morningCapacity,
+      eveningCapacity: rawDay?.eveningCapacity ?? fallbackEvening ?? defaultDay.eveningCapacity,
+    }
+    normalized[day] = daySchedule
+  }
+
+  return normalized
 }
 
 export function mapAppointment(api: ApiAppointment): Appointment {
@@ -65,7 +94,8 @@ export function mapAppointment(api: ApiAppointment): Appointment {
     patientAge: api.patientAge,
     patientPhone: api.patientPhone,
     status: api.status,
-    queueNumber: api.doctorQueueNumber,
+    arrivedAt: api.arrivedAt ?? null,
+    queueNumber: api.doctorQueueNumber ?? null,
     dailyQueueNumber: api.dailyQueueNumber ?? null,
     createdAt: api.createdAt,
   }

@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const [doctor, service] = await Promise.all([
+  const [doctor, service, appointment] = await Promise.all([
     displayState.doctorId
       ? prisma.doctor.findUnique({
           where: { id: displayState.doctorId },
@@ -44,12 +44,19 @@ export async function GET(request: NextRequest) {
           select: { id: true, nameFr: true, nameAr: true },
         })
       : Promise.resolve(null),
+    displayState.appointmentId
+      ? prisma.appointment.findUnique({
+          where: { id: displayState.appointmentId },
+          select: { id: true, patientName: true },
+        })
+      : Promise.resolve(null),
   ]);
 
   return NextResponse.json({
     changed: true,
     mode: displayState.mode,
     shownQueueNumber: displayState.shownQueueNumber,
+    appointment,
     doctor,
     service,
     updatedAt: displayState.updatedAt,

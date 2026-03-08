@@ -170,6 +170,7 @@ export const translations = {
         media_file_label: "Fichier video (.mp4, .webm)",
 
         // Statuses
+        status_booked: "Reserve",
         status_waiting: "En attente",
         status_called: "Appele",
         status_done: "Termine",
@@ -348,6 +349,7 @@ export const translations = {
         media_file_label: "\u0645\u0644\u0641 \u0641\u064A\u062F\u064A\u0648 (.mp4, .webm)",
 
         // Statuses
+        status_booked: "\u0645\u062D\u062C\u0648\u0632",
         status_waiting: "\u0641\u064A \u0627\u0644\u0627\u0646\u062A\u0638\u0627\u0631",
         status_called: "\u062A\u0645 \u0627\u0644\u0646\u062F\u0627\u0621",
         status_done: "\u0645\u0643\u062A\u0645\u0644",

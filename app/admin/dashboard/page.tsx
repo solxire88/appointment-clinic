@@ -232,7 +232,7 @@ export default function DashboardPage() {
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {pd.nextWaiting
-                          ? `#${pd.nextWaiting.queueNumber}${pd.nextWaiting.patientName ? ` - ${pd.nextWaiting.patientName}` : ""}`
+                          ? pd.nextWaiting.patientName
                           : "-"
                         }
                       </TableCell>

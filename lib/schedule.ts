@@ -15,7 +15,15 @@ export function isDoctorScheduled(
 
 export function getSlotCapacity(
   doctor: { morningCapacity: number; eveningCapacity: number },
-  slot: Slot
+  slot: Slot,
+  daySchedule?: {
+    morningCapacity?: number;
+    eveningCapacity?: number;
+  } | null
 ): number {
-  return slot === "MORNING" ? doctor.morningCapacity : doctor.eveningCapacity;
+  if (slot === "MORNING") {
+    return daySchedule?.morningCapacity ?? doctor.morningCapacity;
+  }
+
+  return daySchedule?.eveningCapacity ?? doctor.eveningCapacity;
 }

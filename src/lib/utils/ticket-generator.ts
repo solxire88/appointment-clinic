@@ -1,7 +1,6 @@
 import { jsPDF } from "jspdf"
 
 interface TicketData {
-  queueNumber: number
   date: string
   slot: string
   service_fr: string
@@ -32,27 +31,23 @@ export async function generateTicketPDF(data: TicketData): Promise<void> {
     const clinicName = data.locale === "ar" ? "عيادة مرابط" : "Clinique Mrabeut"
     pdf.text(clinicName, margin, margin + 6, { maxWidth: contentWidth, align: data.locale === "ar" ? "right" : "left" })
     
-    // Queue number - prominent
+    // Title
     pdf.setTextColor(10, 60, 50)
-    pdf.setFontSize(28)
+    pdf.setFontSize(20)
     pdf.setFont("helvetica", "bold")
-    const queueLabel = data.locale === "ar" ? "رقمك في الانتظار" : "Votre numéro"
-    pdf.text(queueLabel, margin, margin + 18, { maxWidth: contentWidth, align: data.locale === "ar" ? "right" : "left" })
-    
-    pdf.setTextColor(30, 120, 100)
-    pdf.setFontSize(48)
-    pdf.text(String(data.queueNumber), margin, margin + 32)
+    const ticketTitle = data.locale === "ar" ? "تأكيد الموعد" : "Confirmation de rendez-vous"
+    pdf.text(ticketTitle, margin, margin + 18, { maxWidth: contentWidth, align: data.locale === "ar" ? "right" : "left" })
     
     // Divider
     pdf.setDrawColor(160, 200, 190)
-    pdf.line(margin, margin + 37, pageWidth - margin, margin + 37)
+    pdf.line(margin, margin + 25, pageWidth - margin, margin + 25)
     
     // Details
     pdf.setTextColor(60, 70, 80)
     pdf.setFontSize(9)
     pdf.setFont("helvetica", "normal")
     
-    let y = margin + 43
+    let y = margin + 31
     
     const addRow = (label: string, value: string) => {
       pdf.setFont("helvetica", "bold")
@@ -96,7 +91,7 @@ export async function generateTicketPDF(data: TicketData): Promise<void> {
     pdf.text(footerText, margin, pageHeight - margin, { maxWidth: contentWidth, align: data.locale === "ar" ? "right" : "left" })
     
     // Download
-    pdf.save(`ticket-${data.queueNumber}.pdf`)
+    pdf.save(`ticket-rdv-${data.date}.pdf`)
   } catch (error) {
     console.error("[v0] Ticket PDF generation error:", error)
     throw new Error("Failed to generate ticket")

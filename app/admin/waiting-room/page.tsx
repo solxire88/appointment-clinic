@@ -27,7 +27,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog"
-import { Monitor, Phone, Pause, Volume2, Search, CheckCircle, UserCheck } from "lucide-react"
+import { Monitor, Phone, Volume2, Search, CheckCircle, UserCheck } from "lucide-react"
 import Image from "next/image"
 
 export default function AdminWaitingRoomPage() {
@@ -44,6 +44,18 @@ export default function AdminWaitingRoomPage() {
 
   const serviceMap = Object.fromEntries(services.map((s) => [s.id, s]))
   const doctorMap = Object.fromEntries(doctors.map((d) => [d.id, d]))
+  const getArrivalSortValue = (appointment: Appointment) => {
+    const candidates = [appointment.arrivedAt, appointment.createdAt]
+    for (const value of candidates) {
+      if (value) {
+        const timestamp = new Date(value).getTime()
+        if (Number.isFinite(timestamp)) return timestamp
+      }
+    }
+    return Number.MAX_SAFE_INTEGER
+  }
+  const sortByArrival = (a: Appointment, b: Appointment) =>
+    getArrivalSortValue(a) - getArrivalSortValue(b)
 
   const loadData = useCallback(async () => {
     const [appts, svcs, docs, displayResult] = await Promise.all([
@@ -66,10 +78,13 @@ export default function AdminWaitingRoomPage() {
   // Per-doctor summary
   const doctorSummaries = doctors.map((doc) => {
     const docAppts = appointments.filter((a) => a.doctorId === doc.id)
-    const waiting = docAppts.filter((a) => a.status === "WAITING").sort((a, b) => a.queueNumber - b.queueNumber)
+    const waiting = docAppts
+      .filter((a) => a.status === "WAITING")
+      .sort(sortByArrival)
     const called = docAppts.filter((a) => a.status === "CALLED")
     const done = docAppts.filter((a) => a.status === "DONE")
-    return { doctor: doc, waiting, called, done, total: docAppts.length }
+    const total = waiting.length + called.length + done.length
+    return { doctor: doc, waiting, called, done, total }
   }).filter((d) => d.total > 0)
 
   const filteredSummaries = searchQuery
@@ -100,14 +115,15 @@ export default function AdminWaitingRoomPage() {
     }
   }
 
-  const handleMarkDone = async (id: string) => {
-    await updateAppointmentStatus(id, "DONE")
-    await loadData()
-  }
-
-  const handleSetIdle = async () => {
+  const handleFinishCall = async (id: string) => {
     setLoading(true)
-    try { await setDisplayState("IDLE"); await loadData() } finally { setLoading(false) }
+    try {
+      await updateAppointmentStatus(id, "DONE")
+      await setDisplayState("IDLE")
+      await loadData()
+    } finally {
+      setLoading(false)
+    }
   }
 
 
@@ -116,7 +132,9 @@ export default function AdminWaitingRoomPage() {
 
   // Waiting appointments for the select modal
   const selectDoctorWaiting = selectDoctorId
-    ? appointments.filter((a) => a.doctorId === selectDoctorId && a.status === "WAITING").sort((a, b) => a.queueNumber - b.queueNumber)
+    ? appointments
+        .filter((a) => a.doctorId === selectDoctorId && a.status === "WAITING")
+        .sort(sortByArrival)
     : []
 
   const displayBadge = {
@@ -130,12 +148,6 @@ export default function AdminWaitingRoomPage() {
       <div className="flex flex-col gap-6">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <h1 className="text-2xl font-bold text-foreground">{t("admin_waiting_room")}</h1>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={handleSetIdle} disabled={loading} className="text-foreground bg-transparent">
-              <Pause className="h-4 w-4 ltr:mr-2 rtl:ml-2" />
-              {t("admin_set_idle")}
-            </Button>
-          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-4">
@@ -178,7 +190,9 @@ export default function AdminWaitingRoomPage() {
                   return (
                     <div key={apt.id} className="flex items-center justify-between bg-card rounded-xl p-4 border border-border/50">
                       <div className="flex items-center gap-4">
-                        <div className="text-3xl font-black text-clinic-deep">#{apt.queueNumber}</div>
+                        <div className="rounded-full bg-clinic-mint p-2">
+                          <UserCheck className="h-5 w-5 text-clinic-accent" />
+                        </div>
                         <div>
                           <p className="font-medium text-foreground">{apt.patientName}</p>
                           <p className="text-sm text-muted-foreground">
@@ -186,9 +200,14 @@ export default function AdminWaitingRoomPage() {
                           </p>
                         </div>
                       </div>
-                      <Button size="sm" variant="outline" onClick={() => handleMarkDone(apt.id)} className="text-clinic-deep hover:bg-clinic-mint bg-transparent">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleFinishCall(apt.id)}
+                        className="text-clinic-deep hover:bg-clinic-mint bg-transparent"
+                      >
                         <CheckCircle className="h-4 w-4 ltr:mr-1 rtl:ml-1" />
-                        {t("status_done")}
+                        {locale === "ar" ? "إنهاء النداء" : "Terminer l'appel"}
                       </Button>
                     </div>
                   )
@@ -203,9 +222,6 @@ export default function AdminWaitingRoomPage() {
           <Monitor className="h-4 w-4 text-muted-foreground" />
           <span className="text-muted-foreground">{t("admin_display_state")}:</span>
           {display && <Badge className={displayBadge[display.state].className}>{displayBadge[display.state].label}</Badge>}
-          {display?.state === "CALLING" && display.queueNumber && (
-            <span className="text-foreground">#{display.queueNumber}</span>
-          )}
         </div>
 
         {/* Doctor search */}
@@ -250,7 +266,7 @@ export default function AdminWaitingRoomPage() {
                 {/* Next waiting */}
                 {waiting.length > 0 && (
                   <div className="text-sm text-muted-foreground mb-4 bg-clinic-soft rounded-lg p-2.5">
-                    <span className="font-medium text-foreground">#{waiting[0].queueNumber}</span> - {waiting[0].patientName}
+                    <span className="font-medium text-foreground">{waiting[0].patientName}</span>
                   </div>
                 )}
 
@@ -307,8 +323,7 @@ export default function AdminWaitingRoomPage() {
                   className="flex items-center justify-between p-3 rounded-lg bg-clinic-soft hover:bg-clinic-mint transition-colors text-left"
                 >
                   <div>
-                    <span className="font-bold text-foreground">#{apt.queueNumber}</span>
-                    <span className="text-muted-foreground ltr:ml-3 rtl:mr-3">{apt.patientName}</span>
+                    <span className="font-bold text-foreground">{apt.patientName}</span>
                   </div>
                   <Phone className="h-4 w-4 text-clinic-accent" />
                 </button>

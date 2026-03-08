@@ -12,6 +12,8 @@ export interface Service {
 export interface DaySlots {
   morning: boolean
   evening: boolean
+  morningCapacity: number
+  eveningCapacity: number
 }
 
 export type WeekDay = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun"
@@ -32,7 +34,7 @@ export interface Doctor {
 }
 
 export type AppointmentSlot = "morning" | "evening"
-export type AppointmentStatus = "WAITING" | "CALLED" | "DONE" | "NO_SHOW"
+export type AppointmentStatus = "BOOKED" | "WAITING" | "CALLED" | "DONE" | "NO_SHOW"
 
 export interface Appointment {
   id: string
@@ -44,7 +46,8 @@ export interface Appointment {
   patientAge: number
   patientPhone: string
   status: AppointmentStatus
-  queueNumber: number
+  arrivedAt?: string | null
+  queueNumber: number | null
   dailyQueueNumber?: number | null
   createdAt: string
 }
@@ -109,7 +112,7 @@ export interface DashboardStats {
     waiting: number
     called: number
     done: number
-    nextWaiting?: { queueNumber: number; patientName: string }
+    nextWaiting?: { patientName: string }
   }[]
 }
 
@@ -121,11 +124,11 @@ export interface AvailableDoctor {
 export const WEEK_DAYS: WeekDay[] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 
 export const DEFAULT_SCHEDULE: WeeklySchedule = {
-  mon: { morning: true, evening: true },
-  tue: { morning: true, evening: true },
-  wed: { morning: true, evening: true },
-  thu: { morning: true, evening: true },
-  fri: { morning: false, evening: false },
-  sat: { morning: true, evening: false },
-  sun: { morning: false, evening: false },
+  mon: { morning: true, evening: true, morningCapacity: 10, eveningCapacity: 8 },
+  tue: { morning: true, evening: true, morningCapacity: 10, eveningCapacity: 8 },
+  wed: { morning: true, evening: true, morningCapacity: 10, eveningCapacity: 8 },
+  thu: { morning: true, evening: true, morningCapacity: 10, eveningCapacity: 8 },
+  fri: { morning: false, evening: false, morningCapacity: 0, eveningCapacity: 0 },
+  sat: { morning: true, evening: false, morningCapacity: 10, eveningCapacity: 0 },
+  sun: { morning: false, evening: false, morningCapacity: 0, eveningCapacity: 0 },
 }

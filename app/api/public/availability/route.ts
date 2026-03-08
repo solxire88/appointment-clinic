@@ -99,7 +99,11 @@ export async function GET(request: NextRequest) {
         return null;
       }
 
-      const capacity = getSlotCapacity(doctor, slot);
+      const capacity = getSlotCapacity(
+        doctor,
+        slot,
+        scheduleParse.data[weekday]
+      );
       const booked = countMap.get(doctor.id) ?? 0;
       const remaining = capacity - booked;
 

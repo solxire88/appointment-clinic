@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import { jsonError } from "@/lib/api";
@@ -17,8 +18,8 @@ const doctorSchema = z
     titleAr: z.string().min(1),
     photoUrl: z.string().min(1).optional().or(z.literal("")),
     scheduleJson: scheduleSchema,
-    morningCapacity: z.number().int().min(0),
-    eveningCapacity: z.number().int().min(0),
+    morningCapacity: z.number().int().min(0).optional(),
+    eveningCapacity: z.number().int().min(0).optional(),
     active: z.boolean().optional(),
   })
   .strip();
@@ -27,12 +28,20 @@ export async function GET() {
   const session = await requireAdminSession();
   if (!session) return jsonError("Unauthorized", 401);
 
-  const doctors = await prisma.doctor.findMany({
-    orderBy: { createdAt: "desc" },
-    include: { service: true },
-  });
+  try {
+    const doctors = await prisma.doctor.findMany({
+      orderBy: { createdAt: "desc" },
+      include: { service: true },
+    });
 
-  return NextResponse.json({ doctors });
+    return NextResponse.json({ doctors });
+  } catch (error) {
+    console.error("[admin/doctors][GET] failed", error);
+    if (error instanceof Prisma.PrismaClientInitializationError) {
+      return jsonError("Database connection failed.", 500, "DB_CONNECTION_FAILED");
+    }
+    return jsonError("Unable to load doctors.", 500);
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -49,18 +58,36 @@ export async function POST(request: NextRequest) {
   const parsed = doctorSchema.safeParse(payload);
   if (!parsed.success) return jsonError("Invalid doctor data.", 400);
 
-  const service = await prisma.service.findUnique({
-    where: { id: parsed.data.serviceId },
-  });
-  if (!service) return jsonError("Service not found.", 404);
+  try {
+    const service = await prisma.service.findUnique({
+      where: { id: parsed.data.serviceId },
+    });
+    if (!service) return jsonError("Service not found.", 404);
 
-  const doctor = await prisma.doctor.create({
-    data: {
-      ...parsed.data,
-      photoUrl: parsed.data.photoUrl || null,
-      active: parsed.data.active ?? true,
-    },
-  });
+    const doctor = await prisma.doctor.create({
+      data: {
+        ...parsed.data,
+        photoUrl: parsed.data.photoUrl || null,
+        morningCapacity: parsed.data.morningCapacity ?? 0,
+        eveningCapacity: parsed.data.eveningCapacity ?? 0,
+        active: parsed.data.active ?? true,
+      },
+    });
 
-  return NextResponse.json({ doctor });
+    return NextResponse.json({ doctor });
+  } catch (error) {
+    console.error("[admin/doctors][POST] failed", error);
+    if (error instanceof Prisma.PrismaClientInitializationError) {
+      return jsonError("Database connection failed.", 500, "DB_CONNECTION_FAILED");
+    }
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2000") {
+        return jsonError("Photo URL is too long.", 400, "PHOTO_URL_TOO_LONG");
+      }
+      if (error.code === "P2002") {
+        return jsonError("Doctor already exists.", 409, "DOCTOR_DUPLICATE");
+      }
+    }
+    return jsonError("Unable to create doctor.", 500);
+  }
 }

@@ -8,23 +8,23 @@ import type {
 } from "../types"
 
 const defaultSchedule: WeeklySchedule = {
-  mon: { morning: true, evening: true },
-  tue: { morning: true, evening: true },
-  wed: { morning: true, evening: true },
-  thu: { morning: true, evening: true },
-  fri: { morning: false, evening: false },
-  sat: { morning: true, evening: false },
-  sun: { morning: false, evening: false },
+  mon: { morning: true, evening: true, morningCapacity: 10, eveningCapacity: 8 },
+  tue: { morning: true, evening: true, morningCapacity: 10, eveningCapacity: 8 },
+  wed: { morning: true, evening: true, morningCapacity: 10, eveningCapacity: 8 },
+  thu: { morning: true, evening: true, morningCapacity: 10, eveningCapacity: 8 },
+  fri: { morning: false, evening: false, morningCapacity: 0, eveningCapacity: 0 },
+  sat: { morning: true, evening: false, morningCapacity: 10, eveningCapacity: 0 },
+  sun: { morning: false, evening: false, morningCapacity: 0, eveningCapacity: 0 },
 }
 
 const morningOnlySchedule: WeeklySchedule = {
-  mon: { morning: true, evening: false },
-  tue: { morning: true, evening: false },
-  wed: { morning: true, evening: false },
-  thu: { morning: true, evening: false },
-  fri: { morning: false, evening: false },
-  sat: { morning: true, evening: false },
-  sun: { morning: false, evening: false },
+  mon: { morning: true, evening: false, morningCapacity: 8, eveningCapacity: 0 },
+  tue: { morning: true, evening: false, morningCapacity: 8, eveningCapacity: 0 },
+  wed: { morning: true, evening: false, morningCapacity: 8, eveningCapacity: 0 },
+  thu: { morning: true, evening: false, morningCapacity: 8, eveningCapacity: 0 },
+  fri: { morning: false, evening: false, morningCapacity: 0, eveningCapacity: 0 },
+  sat: { morning: true, evening: false, morningCapacity: 8, eveningCapacity: 0 },
+  sun: { morning: false, evening: false, morningCapacity: 0, eveningCapacity: 0 },
 }
 
 export const mockServices: Service[] = [
@@ -80,12 +80,12 @@ export const mockServices: Service[] = [
 
 export const mockDoctors: Doctor[] = [
   { id: "doc-1", name_fr: "Dr. Amine Bouzid", name_ar: "\u062F. \u0623\u0645\u064A\u0646 \u0628\u0648\u0632\u064A\u062F", title_fr: "Medecin Generaliste", title_ar: "\u0637\u0628\u064A\u0628 \u0639\u0627\u0645", serviceId: "svc-1", photoUrl: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=200&h=200&fit=crop&crop=face", schedule: { ...defaultSchedule }, capacityMorning: 10, capacityEvening: 8 },
-  { id: "doc-2", name_fr: "Dr. Fatima Rahmani", name_ar: "\u062F. \u0641\u0627\u0637\u0645\u0629 \u0631\u062D\u0645\u0627\u0646\u064A", title_fr: "Medecin Generaliste", title_ar: "\u0637\u0628\u064A\u0628\u0629 \u0639\u0627\u0645\u0629", serviceId: "svc-1", photoUrl: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=200&h=200&fit=crop&crop=face", schedule: { ...defaultSchedule, sat: { morning: true, evening: true } }, capacityMorning: 8, capacityEvening: 6 },
+  { id: "doc-2", name_fr: "Dr. Fatima Rahmani", name_ar: "\u062F. \u0641\u0627\u0637\u0645\u0629 \u0631\u062D\u0645\u0627\u0646\u064A", title_fr: "Medecin Generaliste", title_ar: "\u0637\u0628\u064A\u0628\u0629 \u0639\u0627\u0645\u0629", serviceId: "svc-1", photoUrl: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=200&h=200&fit=crop&crop=face", schedule: { ...defaultSchedule, sat: { morning: true, evening: true, morningCapacity: 8, eveningCapacity: 6 } }, capacityMorning: 8, capacityEvening: 6 },
   { id: "doc-3", name_fr: "Dr. Karim Hadj", name_ar: "\u062F. \u0643\u0631\u064A\u0645 \u062D\u0627\u062C", title_fr: "Cardiologue", title_ar: "\u0637\u0628\u064A\u0628 \u0642\u0644\u0628", serviceId: "svc-2", photoUrl: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=200&h=200&fit=crop&crop=face", schedule: { ...morningOnlySchedule }, capacityMorning: 6, capacityEvening: 0 },
   { id: "doc-4", name_fr: "Dr. Salima Khelifi", name_ar: "\u062F. \u0633\u0644\u064A\u0645\u0629 \u062E\u0644\u064A\u0641\u064A", title_fr: "Pediatre", title_ar: "\u0637\u0628\u064A\u0628\u0629 \u0623\u0637\u0641\u0627\u0644", serviceId: "svc-3", photoUrl: "https://images.unsplash.com/photo-1594824476967-48c8b964ac31?w=200&h=200&fit=crop&crop=face", schedule: { ...defaultSchedule }, capacityMorning: 10, capacityEvening: 8 },
-  { id: "doc-5", name_fr: "Dr. Yacine Mebarki", name_ar: "\u062F. \u064A\u0627\u0633\u064A\u0646 \u0645\u0628\u0627\u0631\u0643\u064A", title_fr: "Pediatre", title_ar: "\u0637\u0628\u064A\u0628 \u0623\u0637\u0641\u0627\u0644", serviceId: "svc-3", schedule: { ...defaultSchedule, sat: { morning: false, evening: false } }, capacityMorning: 8, capacityEvening: 6 },
+  { id: "doc-5", name_fr: "Dr. Yacine Mebarki", name_ar: "\u062F. \u064A\u0627\u0633\u064A\u0646 \u0645\u0628\u0627\u0631\u0643\u064A", title_fr: "Pediatre", title_ar: "\u0637\u0628\u064A\u0628 \u0623\u0637\u0641\u0627\u0644", serviceId: "svc-3", schedule: { ...defaultSchedule, sat: { morning: false, evening: false, morningCapacity: 0, eveningCapacity: 0 } }, capacityMorning: 8, capacityEvening: 6 },
   { id: "doc-6", name_fr: "Dr. Nadia Belkacem", name_ar: "\u062F. \u0646\u0627\u062F\u064A\u0629 \u0628\u0644\u0642\u0627\u0633\u0645", title_fr: "Dermatologue", title_ar: "\u0637\u0628\u064A\u0628\u0629 \u062C\u0644\u062F", serviceId: "svc-4", photoUrl: "https://images.unsplash.com/photo-1651008376811-b90baee60c1f?w=200&h=200&fit=crop&crop=face", schedule: { ...defaultSchedule }, capacityMorning: 8, capacityEvening: 6 },
-  { id: "doc-7", name_fr: "Dr. Leila Amrani", name_ar: "\u062F. \u0644\u064A\u0644\u0649 \u0639\u0645\u0631\u0627\u0646\u064A", title_fr: "Gynecologue", title_ar: "\u0637\u0628\u064A\u0628\u0629 \u0646\u0633\u0627\u0621", serviceId: "svc-5", schedule: { ...morningOnlySchedule, sat: { morning: true, evening: false } }, capacityMorning: 6, capacityEvening: 0 },
+  { id: "doc-7", name_fr: "Dr. Leila Amrani", name_ar: "\u062F. \u0644\u064A\u0644\u0649 \u0639\u0645\u0631\u0627\u0646\u064A", title_fr: "Gynecologue", title_ar: "\u0637\u0628\u064A\u0628\u0629 \u0646\u0633\u0627\u0621", serviceId: "svc-5", schedule: { ...morningOnlySchedule, sat: { morning: true, evening: false, morningCapacity: 6, eveningCapacity: 0 } }, capacityMorning: 6, capacityEvening: 0 },
   { id: "doc-8", name_fr: "Dr. Mourad Ziane", name_ar: "\u062F. \u0645\u0631\u0627\u062F \u0632\u064A\u0627\u0646", title_fr: "Ophtalmologue", title_ar: "\u0637\u0628\u064A\u0628 \u0639\u064A\u0648\u0646", serviceId: "svc-6", photoUrl: "https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=200&h=200&fit=crop&crop=face", schedule: { ...defaultSchedule }, capacityMorning: 8, capacityEvening: 6 },
 ]
 

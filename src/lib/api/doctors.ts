@@ -3,6 +3,15 @@ import type { AvailableDoctor, Doctor } from "@/src/lib/types"
 import { apiClient } from "@/src/lib/apiClient"
 import { mapAvailabilityDoctor, mapDoctor, toApiSlot } from "@/src/lib/api/mappers"
 
+function getFallbackCapacities(schedule: Doctor["schedule"]) {
+  const morning = Object.values(schedule).map((day) => day.morningCapacity)
+  const evening = Object.values(schedule).map((day) => day.eveningCapacity)
+  return {
+    morningCapacity: Math.max(0, ...morning, 0),
+    eveningCapacity: Math.max(0, ...evening, 0),
+  }
+}
+
 export async function getDoctors(scope: "public" | "admin" = "public"): Promise<Doctor[]> {
   const url = scope === "admin" ? "/api/admin/doctors" : "/api/public/doctors"
   const data = await apiClient.get<{ doctors: ApiDoctor[] }>(url)
@@ -41,6 +50,7 @@ export async function listAvailableDoctors(opts: {
 
 export async function createDoctor(data: Omit<Doctor, "id">): Promise<Doctor> {
   const photoUrl = data.photoUrl?.trim()
+  const fallbackCapacities = getFallbackCapacities(data.schedule)
   const payload = {
     serviceId: data.serviceId,
     nameFr: data.name_fr,
@@ -49,8 +59,8 @@ export async function createDoctor(data: Omit<Doctor, "id">): Promise<Doctor> {
     titleAr: data.title_ar,
     photoUrl: photoUrl || "",
     scheduleJson: data.schedule,
-    morningCapacity: data.capacityMorning,
-    eveningCapacity: data.capacityEvening,
+    morningCapacity: fallbackCapacities.morningCapacity,
+    eveningCapacity: fallbackCapacities.eveningCapacity,
     active: true,
   }
   const response = await apiClient.post<{ doctor: ApiDoctor }>("/api/admin/doctors", payload)
@@ -59,6 +69,9 @@ export async function createDoctor(data: Omit<Doctor, "id">): Promise<Doctor> {
 
 export async function updateDoctor(id: string, data: Partial<Doctor>): Promise<Doctor> {
   const payload: Record<string, unknown> = {}
+  const fallbackCapacities = data.schedule
+    ? getFallbackCapacities(data.schedule)
+    : null
   if (data.serviceId !== undefined) payload.serviceId = data.serviceId
   if (data.name_fr !== undefined) payload.nameFr = data.name_fr
   if (data.name_ar !== undefined) payload.nameAr = data.name_ar
@@ -66,6 +79,8 @@ export async function updateDoctor(id: string, data: Partial<Doctor>): Promise<D
   if (data.title_ar !== undefined) payload.titleAr = data.title_ar
   if (data.photoUrl !== undefined) payload.photoUrl = data.photoUrl || ""
   if (data.schedule !== undefined) payload.scheduleJson = data.schedule
+  if (fallbackCapacities) payload.morningCapacity = fallbackCapacities.morningCapacity
+  if (fallbackCapacities) payload.eveningCapacity = fallbackCapacities.eveningCapacity
   if (data.capacityMorning !== undefined) payload.morningCapacity = data.capacityMorning
   if (data.capacityEvening !== undefined) payload.eveningCapacity = data.capacityEvening
 

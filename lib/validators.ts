@@ -4,6 +4,7 @@ import { isValidDateString } from "@/lib/timezone";
 
 export const slotSchema = z.enum(["MORNING", "EVENING"]);
 export const appointmentStatusSchema = z.enum([
+  "BOOKED",
   "WAITING",
   "CALLED",
   "DONE",
@@ -19,6 +20,8 @@ export const dateStringSchema = z
 const dayScheduleSchema = z.object({
   morning: z.boolean(),
   evening: z.boolean(),
+  morningCapacity: z.number().int().min(0).optional(),
+  eveningCapacity: z.number().int().min(0).optional(),
 });
 
 export const scheduleSchema = z

@@ -86,7 +86,9 @@ export async function createAppointment(input: {
   patientName: string
   patientAge: number
   patientPhone: string
-}): Promise<{ appointment: Appointment; queueNumber: number; dailyQueueNumber?: number | null }> {
+  middleName?: string
+  startedAtMs?: number
+}): Promise<{ appointment: Appointment; queueNumber: number | null; dailyQueueNumber?: number | null }> {
   try {
     const response = await apiClient.post<ApiCreateAppointmentResponse>("/api/appointments", {
       appointmentDate: input.date,
@@ -96,6 +98,8 @@ export async function createAppointment(input: {
       patientName: input.patientName,
       patientAge: input.patientAge,
       patientPhone: input.patientPhone,
+      middleName: input.middleName,
+      startedAtMs: input.startedAtMs,
     })
 
     return {
@@ -107,6 +111,12 @@ export async function createAppointment(input: {
     if (error instanceof ApiError) {
       if (error.code === "SLOT_FULL" || error.status === 409) {
         throw new Error("SLOT_FULL")
+      }
+      if (error.code === "BOT_SUSPECTED") {
+        throw new Error("BOT_SUSPECTED")
+      }
+      if (error.code === "TOO_MANY_REQUESTS" || error.status === 429) {
+        throw new Error("TOO_MANY_REQUESTS")
       }
     }
     throw error
@@ -121,6 +131,7 @@ export async function createAdminAppointment(input: {
   patientName: string
   patientAge: number
   patientPhone: string
+  queueNumber?: number | null
   status?: AppointmentStatus
 }): Promise<Appointment> {
   try {
@@ -132,6 +143,7 @@ export async function createAdminAppointment(input: {
       patientName: input.patientName,
       patientAge: input.patientAge,
       patientPhone: input.patientPhone,
+      queueNumber: input.queueNumber,
       status: input.status,
     })
 
@@ -140,6 +152,9 @@ export async function createAdminAppointment(input: {
     if (error instanceof ApiError) {
       if (error.code === "SLOT_FULL" || error.status === 409) {
         throw new Error("SLOT_FULL")
+      }
+      if (error.code === "QUEUE_NUMBER_TAKEN") {
+        throw new Error("QUEUE_NUMBER_TAKEN")
       }
       if (error.status === 400 && error.message.includes("scheduled")) {
         throw new Error("SCHEDULE_UNAVAILABLE")
@@ -163,6 +178,7 @@ export async function updateAppointment(
     patientName?: string
     patientAge?: number
     patientPhone?: string
+    queueNumber?: number | null
     status?: AppointmentStatus
   }
 ): Promise<Appointment> {
@@ -175,6 +191,7 @@ export async function updateAppointment(
     if (data.patientName !== undefined) payload.patientName = data.patientName
     if (data.patientAge !== undefined) payload.patientAge = data.patientAge
     if (data.patientPhone !== undefined) payload.patientPhone = data.patientPhone
+    if (data.queueNumber !== undefined) payload.queueNumber = data.queueNumber
     if (data.status !== undefined) payload.status = data.status
 
     const response = await apiClient.patch<{ appointment: ApiAppointment }>(
@@ -187,6 +204,9 @@ export async function updateAppointment(
     if (error instanceof ApiError) {
       if (error.code === "SLOT_FULL" || error.status === 409) {
         throw new Error("SLOT_FULL")
+      }
+      if (error.code === "QUEUE_NUMBER_TAKEN") {
+        throw new Error("QUEUE_NUMBER_TAKEN")
       }
       if (error.status === 400 && error.message.includes("scheduled")) {
         throw new Error("SCHEDULE_UNAVAILABLE")
@@ -216,26 +236,40 @@ export async function callNextForDoctor(params: {
   date: string
   slot: AppointmentSlot
 }): Promise<Appointment | null> {
-  const response = await apiClient.post<{
-    appointment: ApiAppointment | null
-  }>("/api/admin/waiting-room/call-next", {
-    appointmentDate: params.date,
-    slot: toApiSlot(params.slot),
-    doctorId: params.doctorId,
-  })
+  try {
+    const response = await apiClient.post<{
+      appointment: ApiAppointment | null
+    }>("/api/admin/waiting-room/call-next", {
+      appointmentDate: params.date,
+      slot: toApiSlot(params.slot),
+      doctorId: params.doctorId,
+    })
 
-  if (!response.appointment) return null
-  return mapAppointment(response.appointment)
+    if (!response.appointment) return null
+    return mapAppointment(response.appointment)
+  } catch (error) {
+    if (error instanceof ApiError && error.code === "NOT_WAITING") {
+      throw new Error("NOT_WAITING")
+    }
+    throw error
+  }
 }
 
 export async function callSpecificForDoctor(appointmentId: string): Promise<Appointment> {
-  const response = await apiClient.post<{
-    appointment: ApiAppointment
-  }>("/api/admin/waiting-room/call-specific", {
-    appointmentId,
-  })
+  try {
+    const response = await apiClient.post<{
+      appointment: ApiAppointment
+    }>("/api/admin/waiting-room/call-specific", {
+      appointmentId,
+    })
 
-  return mapAppointment(response.appointment)
+    return mapAppointment(response.appointment)
+  } catch (error) {
+    if (error instanceof ApiError && error.code === "NOT_WAITING") {
+      throw new Error("NOT_WAITING")
+    }
+    throw error
+  }
 }
 
 export function apiSlotToLabel(slot: "MORNING" | "EVENING"): AppointmentSlot {

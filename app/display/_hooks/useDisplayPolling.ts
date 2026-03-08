@@ -12,6 +12,7 @@ export type DisplayDestination = {
 export type DisplayPayload = {
   mode: DisplayMode
   queueNumber?: number | null
+  patientName?: string | null
   destination?: DisplayDestination | null
   updatedAt: string
 }
@@ -21,6 +22,7 @@ type ApiDisplayChanged = {
   updatedAt: string
   mode?: DisplayMode
   shownQueueNumber?: number | null
+  appointment?: { id: string; patientName: string } | null
   doctor?: { id: string; nameFr: string; nameAr: string } | null
   service?: { id: string; nameFr: string; nameAr: string } | null
 }
@@ -63,6 +65,7 @@ export function useDisplayPolling() {
       const mapped: DisplayPayload = {
         mode: raw.mode ?? "IDLE",
         queueNumber: raw.shownQueueNumber ?? null,
+        patientName: raw.appointment?.patientName ?? null,
         destination: raw.service || raw.doctor
           ? {
               serviceName: raw.service?.nameFr ?? raw.service?.nameAr ?? "Service",

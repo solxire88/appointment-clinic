@@ -4,7 +4,7 @@ import { z } from "zod";
 import { jsonError } from "@/lib/api";
 import { requireAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getClinicDayRange, normalizeDateToClinicMidnight } from "@/lib/timezone";
+import { getClinicDayRange } from "@/lib/timezone";
 import { dateStringSchema, slotSchema } from "@/lib/validators";
 
 export const runtime = "nodejs";
@@ -14,6 +14,18 @@ const bodySchema = z.object({
   slot: slotSchema,
   doctorId: z.string().min(1),
 });
+
+function getArrivalSortTime(appointment: {
+  arrivedAt: Date | null;
+  updatedAt: Date;
+  createdAt: Date;
+}): number {
+  if (appointment.arrivedAt) {
+    return appointment.arrivedAt.getTime();
+  }
+
+  return appointment.updatedAt.getTime() || appointment.createdAt.getTime();
+}
 
 export async function POST(request: NextRequest) {
   const session = await requireAdminSession();
@@ -30,7 +42,6 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) return jsonError("Invalid request data.", 400);
 
   const { appointmentDate: dateStr, slot, doctorId } = parsed.data;
-  const appointmentDate = normalizeDateToClinicMidnight(dateStr);
   const { start: dayStart, end: dayEnd } = getClinicDayRange(dateStr);
 
   try {
@@ -42,7 +53,7 @@ export async function POST(request: NextRequest) {
           doctorId,
           status: "CALLED",
         },
-        orderBy: { doctorQueueNumber: "desc" },
+        orderBy: { updatedAt: "desc" },
       });
 
       if (currentCalled) {
@@ -52,15 +63,19 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      const nextWaiting = await tx.appointment.findFirst({
+      const waitingCandidates = await tx.appointment.findMany({
         where: {
           appointmentDate: { gte: dayStart, lt: dayEnd },
           slot,
           doctorId,
           status: "WAITING",
         },
-        orderBy: { doctorQueueNumber: "asc" },
+        orderBy: [{ arrivedAt: "asc" }, { updatedAt: "asc" }, { createdAt: "asc" }],
       });
+
+      const nextWaiting = waitingCandidates.sort(
+        (a, b) => getArrivalSortTime(a) - getArrivalSortTime(b)
+      )[0];
 
       if (!nextWaiting) {
         await tx.displayState.upsert({
@@ -101,7 +116,7 @@ export async function POST(request: NextRequest) {
           appointmentId: called.id,
           doctorId: called.doctorId,
           serviceId: called.serviceId,
-          shownQueueNumber: called.doctorQueueNumber,
+          shownQueueNumber: called.dailyQueueNumber ?? called.doctorQueueNumber ?? null,
         },
         create: {
           id: "singleton",
@@ -109,7 +124,7 @@ export async function POST(request: NextRequest) {
           appointmentId: called.id,
           doctorId: called.doctorId,
           serviceId: called.serviceId,
-          shownQueueNumber: called.doctorQueueNumber,
+          shownQueueNumber: called.dailyQueueNumber ?? called.doctorQueueNumber ?? null,
         },
       });
 
@@ -119,13 +134,15 @@ export async function POST(request: NextRequest) {
           appointmentDate: called.appointmentDate,
           slot: called.slot,
           doctorQueueNumber: called.doctorQueueNumber,
+          dailyQueueNumber: called.dailyQueueNumber,
+          arrivedAt: called.arrivedAt,
           status: called.status,
           doctor: called.doctor,
           service: called.service,
         },
         display: {
           mode: "CALLING",
-          shownQueueNumber: called.doctorQueueNumber,
+          shownQueueNumber: called.dailyQueueNumber ?? called.doctorQueueNumber ?? null,
           doctorId: called.doctorId,
           serviceId: called.serviceId,
         },

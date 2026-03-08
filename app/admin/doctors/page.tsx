@@ -45,15 +45,11 @@ interface DoctorForm {
   serviceId: string
   photoUrl: string
   schedule: WeeklySchedule
-  capacityMorning: number
-  capacityEvening: number
 }
 
 const emptyForm: DoctorForm = {
   name_fr: "", name_ar: "", title_fr: "", title_ar: "", serviceId: "", photoUrl: "",
   schedule: JSON.parse(JSON.stringify(DEFAULT_SCHEDULE)),
-  capacityMorning: 10,
-  capacityEvening: 8,
 }
 
 export default function AdminDoctorsPage() {
@@ -96,8 +92,6 @@ export default function AdminDoctorsPage() {
       serviceId: doc.serviceId,
       photoUrl: doc.photoUrl || "",
       schedule: JSON.parse(JSON.stringify(doc.schedule)),
-      capacityMorning: doc.capacityMorning,
-      capacityEvening: doc.capacityEvening,
     })
     setFormError("")
     setDialogOpen(true)
@@ -107,6 +101,30 @@ export default function AdminDoctorsPage() {
     const newSchedule = { ...form.schedule }
     newSchedule[day] = { ...newSchedule[day], [slot]: !newSchedule[day][slot] }
     setForm({ ...form, schedule: newSchedule })
+  }
+
+  const setScheduleCapacity = (day: WeekDay, slot: "morning" | "evening", value: number) => {
+    const newSchedule = { ...form.schedule }
+    const key = slot === "morning" ? "morningCapacity" : "eveningCapacity"
+    newSchedule[day] = {
+      ...newSchedule[day],
+      [key]: Math.max(0, Number.isFinite(value) ? Math.floor(value) : 0),
+    }
+    setForm({ ...form, schedule: newSchedule })
+  }
+
+  const getCapacitySummary = (doc: Doctor) => {
+    const morningValues = WEEK_DAYS.map((day) => doc.schedule[day].morningCapacity)
+    const eveningValues = WEEK_DAYS.map((day) => doc.schedule[day].eveningCapacity)
+    const minMorning = Math.min(...morningValues)
+    const maxMorning = Math.max(...morningValues)
+    const minEvening = Math.min(...eveningValues)
+    const maxEvening = Math.max(...eveningValues)
+
+    const morningText = minMorning === maxMorning ? String(minMorning) : `${minMorning}-${maxMorning}`
+    const eveningText = minEvening === maxEvening ? String(minEvening) : `${minEvening}-${maxEvening}`
+
+    return `${morningText}M / ${eveningText}S`
   }
 
   const handleSave = async () => {
@@ -124,13 +142,16 @@ export default function AdminDoctorsPage() {
         : "Au moins un creneau doit etre active")
       return
     }
-    if (form.capacityMorning < 0 || form.capacityEvening < 0) {
-      setFormError(locale === "ar"
-        ? "\u0627\u0644\u0633\u0639\u0629 \u064A\u062C\u0628 \u0623\u0646 \u062A\u0643\u0648\u0646 >= 0"
-        : "La capacite doit etre >= 0")
-      return
-    }
     setFormError("")
+
+    const fallbackMorning = Math.max(
+      0,
+      ...WEEK_DAYS.map((day) => form.schedule[day].morningCapacity)
+    )
+    const fallbackEvening = Math.max(
+      0,
+      ...WEEK_DAYS.map((day) => form.schedule[day].eveningCapacity)
+    )
 
     const data = {
       name_fr: form.name_fr,
@@ -140,8 +161,8 @@ export default function AdminDoctorsPage() {
       serviceId: form.serviceId,
       photoUrl: form.photoUrl || undefined,
       schedule: form.schedule,
-      capacityMorning: form.capacityMorning,
-      capacityEvening: form.capacityEvening,
+      capacityMorning: fallbackMorning,
+      capacityEvening: fallbackEvening,
     }
     if (editing) {
       await updateDoctor(editing.id, data)
@@ -215,7 +236,7 @@ export default function AdminDoctorsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="hidden lg:table-cell text-muted-foreground text-xs">
-                        {doc.capacityMorning}M / {doc.capacityEvening}S
+                        {getCapacitySummary(doc)}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -316,8 +337,8 @@ export default function AdminDoctorsPage() {
                     <thead>
                       <tr className="bg-muted/50">
                         <th className="p-2 text-left font-medium text-muted-foreground">{locale === "ar" ? "\u0627\u0644\u064A\u0648\u0645" : "Jour"}</th>
-                        <th className="p-2 text-center font-medium text-muted-foreground">{t("schedule_morning")}</th>
-                        <th className="p-2 text-center font-medium text-muted-foreground">{t("schedule_evening")}</th>
+                        <th className="p-2 text-center font-medium text-muted-foreground">{t("schedule_morning")} / {t("capacity_morning")}</th>
+                        <th className="p-2 text-center font-medium text-muted-foreground">{t("schedule_evening")} / {t("capacity_evening")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -325,59 +346,59 @@ export default function AdminDoctorsPage() {
                         <tr key={day} className="border-t border-border/50">
                           <td className="p-2 font-medium text-foreground">{t(dayKeys[day] as never)}</td>
                           <td className="p-2 text-center">
-                            <button
-                              type="button"
-                              onClick={() => toggleScheduleSlot(day, "morning")}
-                              className={`w-7 h-7 rounded-md text-xs font-semibold transition-all ${
-                                form.schedule[day].morning
-                                  ? "bg-clinic-primary text-primary-foreground"
-                                  : "bg-muted text-muted-foreground"
-                              }`}
-                              aria-label={`${t(dayKeys[day] as never)} ${t("schedule_morning")}`}
-                            >
-                              {form.schedule[day].morning ? "M" : "-"}
-                            </button>
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => toggleScheduleSlot(day, "morning")}
+                                className={`w-7 h-7 rounded-md text-xs font-semibold transition-all ${
+                                  form.schedule[day].morning
+                                    ? "bg-clinic-primary text-primary-foreground"
+                                    : "bg-muted text-muted-foreground"
+                                }`}
+                                aria-label={`${t(dayKeys[day] as never)} ${t("schedule_morning")}`}
+                              >
+                                {form.schedule[day].morning ? "M" : "-"}
+                              </button>
+                              <Input
+                                type="number"
+                                min="0"
+                                className="h-7 w-16 text-xs"
+                                value={form.schedule[day].morningCapacity}
+                                onChange={(e) =>
+                                  setScheduleCapacity(day, "morning", Number(e.target.value))
+                                }
+                              />
+                            </div>
                           </td>
                           <td className="p-2 text-center">
-                            <button
-                              type="button"
-                              onClick={() => toggleScheduleSlot(day, "evening")}
-                              className={`w-7 h-7 rounded-md text-xs font-semibold transition-all ${
-                                form.schedule[day].evening
-                                  ? "bg-clinic-accent text-primary-foreground"
-                                  : "bg-muted text-muted-foreground"
-                              }`}
-                              aria-label={`${t(dayKeys[day] as never)} ${t("schedule_evening")}`}
-                            >
-                              {form.schedule[day].evening ? "S" : "-"}
-                            </button>
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => toggleScheduleSlot(day, "evening")}
+                                className={`w-7 h-7 rounded-md text-xs font-semibold transition-all ${
+                                  form.schedule[day].evening
+                                    ? "bg-clinic-accent text-primary-foreground"
+                                    : "bg-muted text-muted-foreground"
+                                }`}
+                                aria-label={`${t(dayKeys[day] as never)} ${t("schedule_evening")}`}
+                              >
+                                {form.schedule[day].evening ? "S" : "-"}
+                              </button>
+                              <Input
+                                type="number"
+                                min="0"
+                                className="h-7 w-16 text-xs"
+                                value={form.schedule[day].eveningCapacity}
+                                onChange={(e) =>
+                                  setScheduleCapacity(day, "evening", Number(e.target.value))
+                                }
+                              />
+                            </div>
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                </div>
-              </div>
-
-              {/* Capacities */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex flex-col gap-2">
-                  <Label>{t("capacity_morning")}</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={form.capacityMorning}
-                    onChange={(e) => setForm({ ...form, capacityMorning: Math.max(0, Number(e.target.value) || 0) })}
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label>{t("capacity_evening")}</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={form.capacityEvening}
-                    onChange={(e) => setForm({ ...form, capacityEvening: Math.max(0, Number(e.target.value) || 0) })}
-                  />
                 </div>
               </div>
 

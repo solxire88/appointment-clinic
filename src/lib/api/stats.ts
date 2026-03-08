@@ -16,8 +16,8 @@ export async function getDashboardStats(date?: string): Promise<DashboardStats> 
     waiting: doc.WAITING,
     called: doc.CALLED,
     done: doc.DONE,
-    nextWaiting: doc.nextWaitingNumber
-      ? { queueNumber: doc.nextWaitingNumber, patientName: "" }
+    nextWaiting: doc.nextWaitingPatientName
+      ? { patientName: doc.nextWaitingPatientName }
       : undefined,
   }))
 

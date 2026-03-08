@@ -7,7 +7,6 @@ import { prisma } from "@/lib/prisma";
 import {
   getClinicDateString,
   getClinicDayRange,
-  normalizeDateToClinicMidnight,
 } from "@/lib/timezone";
 import { dateStringSchema } from "@/lib/validators";
 
@@ -31,10 +30,9 @@ export async function GET(request: NextRequest) {
   }
 
   const dateStr = parsed.data.date ?? getClinicDateString();
-  const appointmentDate = normalizeDateToClinicMidnight(dateStr);
   const { start: dayStart, end: dayEnd } = getClinicDayRange(dateStr);
 
-  const [statusGroups, slotStatusGroups, serviceGroups, doctorStatusGroups, nextWaiting] =
+  const [statusGroups, slotStatusGroups, serviceGroups, doctorStatusGroups, waitingAppointments] =
     await Promise.all([
       prisma.appointment.groupBy({
         by: ["status"],
@@ -56,14 +54,23 @@ export async function GET(request: NextRequest) {
         where: { appointmentDate: { gte: dayStart, lt: dayEnd } },
         _count: { _all: true },
       }),
-      prisma.appointment.groupBy({
-        by: ["doctorId"],
-        where: { appointmentDate: { gte: dayStart, lt: dayEnd }, status: "WAITING" },
-        _min: { doctorQueueNumber: true },
+      prisma.appointment.findMany({
+        where: {
+          appointmentDate: { gte: dayStart, lt: dayEnd },
+          status: "WAITING",
+        },
+        select: {
+          doctorId: true,
+          patientName: true,
+          arrivedAt: true,
+          updatedAt: true,
+          createdAt: true,
+        },
       }),
     ]);
 
   const byStatus: Record<string, number> = {
+    BOOKED: 0,
     WAITING: 0,
     CALLED: 0,
     DONE: 0,
@@ -79,8 +86,8 @@ export async function GET(request: NextRequest) {
   };
 
   const bySlot: Record<string, Record<string, number>> = {
-    MORNING: { WAITING: 0, CALLED: 0, DONE: 0, NO_SHOW: 0, total: 0 },
-    EVENING: { WAITING: 0, CALLED: 0, DONE: 0, NO_SHOW: 0, total: 0 },
+    MORNING: { BOOKED: 0, WAITING: 0, CALLED: 0, DONE: 0, NO_SHOW: 0, total: 0 },
+    EVENING: { BOOKED: 0, WAITING: 0, CALLED: 0, DONE: 0, NO_SHOW: 0, total: 0 },
   };
 
   for (const group of slotStatusGroups) {
@@ -89,6 +96,7 @@ export async function GET(request: NextRequest) {
 
   for (const slot of Object.keys(bySlot)) {
     bySlot[slot].total =
+      bySlot[slot].BOOKED +
       bySlot[slot].WAITING +
       bySlot[slot].CALLED +
       bySlot[slot].DONE +
@@ -119,12 +127,16 @@ export async function GET(request: NextRequest) {
   });
   const doctorMap = new Map(doctors.map((doctor) => [doctor.id, doctor]));
 
-  const waitingMap = new Map(
-    nextWaiting.map((group) => [
-      group.doctorId,
-      group._min.doctorQueueNumber ?? null,
-    ])
-  );
+  const waitingMap = new Map<string, { patientName: string }>();
+  for (const appointment of waitingAppointments.sort((a, b) => {
+    const aTime = a.arrivedAt?.getTime() ?? a.updatedAt.getTime() ?? a.createdAt.getTime();
+    const bTime = b.arrivedAt?.getTime() ?? b.updatedAt.getTime() ?? b.createdAt.getTime();
+    return aTime - bTime;
+  })) {
+    if (!waitingMap.has(appointment.doctorId)) {
+      waitingMap.set(appointment.doctorId, { patientName: appointment.patientName });
+    }
+  }
 
   const doctorStats: Record<
     string,
@@ -135,7 +147,7 @@ export async function GET(request: NextRequest) {
     if (!doctorStats[group.doctorId]) {
       doctorStats[group.doctorId] = { WAITING: 0, CALLED: 0, DONE: 0 };
     }
-    if (group.status !== "NO_SHOW") {
+    if (group.status !== "NO_SHOW" && group.status !== "BOOKED") {
       doctorStats[group.doctorId][group.status] = group._count._all;
     }
   }
@@ -146,7 +158,8 @@ export async function GET(request: NextRequest) {
     WAITING: doctorStats[doctorId]?.WAITING ?? 0,
     CALLED: doctorStats[doctorId]?.CALLED ?? 0,
     DONE: doctorStats[doctorId]?.DONE ?? 0,
-    nextWaitingNumber: waitingMap.get(doctorId) ?? null,
+    nextWaitingNumber: null,
+    nextWaitingPatientName: waitingMap.get(doctorId)?.patientName ?? null,
   }));
 
   return NextResponse.json({

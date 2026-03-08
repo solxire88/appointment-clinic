@@ -4,7 +4,6 @@ import { z } from "zod";
 import { jsonError } from "@/lib/api";
 import { requireAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { nextDailyQueueNumber } from "@/lib/queue";
 import { getSlotCapacity, isDoctorScheduled } from "@/lib/schedule";
 import {
   getClinicWeekday,
@@ -30,6 +29,7 @@ const patchSchema = z
     patientName: z.string().min(1).optional(),
     patientAge: z.number().int().min(0).optional(),
     patientPhone: z.string().min(1).optional(),
+    queueNumber: z.number().int().positive().nullable().optional(),
     status: appointmentStatusSchema.optional(),
     note: z.string().optional(),
   })
@@ -80,6 +80,14 @@ export async function PATCH(
       const doctorId = parsed.data.doctorId ?? existing.doctorId;
       const serviceId = parsed.data.serviceId ?? existing.serviceId;
       const status = parsed.data.status ?? existing.status;
+      let arrivedAt = existing.arrivedAt;
+      const hasQueueNumberInPayload = Object.prototype.hasOwnProperty.call(
+        parsed.data,
+        "queueNumber"
+      );
+      const requestedQueueNumber = hasQueueNumberInPayload
+        ? parsed.data.queueNumber ?? null
+        : null;
 
       const dateChanged = Boolean(parsed.data.appointmentDate);
       const slotChanged = Boolean(parsed.data.slot);
@@ -106,18 +114,22 @@ export async function PATCH(
       }
       if (doctor.serviceId !== serviceId) throw new Error("SERVICE_MISMATCH");
 
-      if (needsScheduleCheck) {
-        const weekday = getClinicWeekday(appointmentDate);
-        const scheduleParse = scheduleSchema.safeParse(doctor.scheduleJson);
-        if (!scheduleParse.success) throw new Error("SCHEDULE_INVALID");
+      const weekday = getClinicWeekday(appointmentDate);
+      const scheduleParse = scheduleSchema.safeParse(doctor.scheduleJson);
+      if (!scheduleParse.success) throw new Error("SCHEDULE_INVALID");
 
+      if (needsScheduleCheck) {
         if (!isDoctorScheduled(scheduleParse.data, weekday, slot)) {
           throw new Error("SCHEDULE_UNAVAILABLE");
         }
       }
 
       if (status !== "NO_SHOW") {
-        const capacity = getSlotCapacity(doctor, slot);
+        const capacity = getSlotCapacity(
+          doctor,
+          slot,
+          scheduleParse.data[weekday]
+        );
         const dateStr =
           parsed.data.appointmentDate ??
           getClinicDateString(existing.appointmentDate);
@@ -134,11 +146,39 @@ export async function PATCH(
         if (bookedCount >= capacity) throw new Error("SLOT_FULL");
       }
 
+      let doctorQueueNumber = existing.doctorQueueNumber ?? null;
       let dailyQueueNumber = existing.dailyQueueNumber ?? null;
-      if (dateChanged) {
-        dailyQueueNumber = await nextDailyQueueNumber(tx, { appointmentDate });
+
+      if (hasQueueNumberInPayload) {
+        doctorQueueNumber = requestedQueueNumber;
+        dailyQueueNumber = requestedQueueNumber;
       }
-      const doctorQueueNumber = dailyQueueNumber ?? existing.doctorQueueNumber;
+
+      if (doctorQueueNumber !== null) {
+        const dateStr =
+          parsed.data.appointmentDate ??
+          getClinicDateString(existing.appointmentDate);
+        const { start: dayStart, end: dayEnd } = getClinicDayRange(dateStr);
+        const queueConflict = await tx.appointment.findFirst({
+          where: {
+            appointmentDate: { gte: dayStart, lt: dayEnd },
+            OR: [
+              { doctorQueueNumber },
+              { dailyQueueNumber: doctorQueueNumber },
+            ],
+            NOT: { id },
+          },
+          select: { id: true },
+        });
+        if (queueConflict) throw new Error("QUEUE_NUMBER_TAKEN");
+      }
+
+      if (status === "WAITING" && existing.status !== "WAITING") {
+        arrivedAt = new Date();
+      }
+      if (status === "BOOKED") {
+        arrivedAt = null;
+      }
 
       return tx.appointment.update({
         where: { id },
@@ -151,6 +191,7 @@ export async function PATCH(
           patientAge: parsed.data.patientAge,
           patientPhone: parsed.data.patientPhone,
           status,
+          arrivedAt,
           doctorQueueNumber,
           dailyQueueNumber,
         },
@@ -177,6 +218,9 @@ export async function PATCH(
       }
       if (error.message === "SLOT_FULL") {
         return jsonError("Slot is full.", 409, "SLOT_FULL");
+      }
+      if (error.message === "QUEUE_NUMBER_TAKEN") {
+        return jsonError("Queue number is already used for this day.", 409, "QUEUE_NUMBER_TAKEN");
       }
       if (error.message === "SCHEDULE_INVALID") {
         return jsonError("Doctor schedule is invalid.", 500);

@@ -4,7 +4,6 @@ import { z } from "zod";
 import { jsonError } from "@/lib/api";
 import { requireAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { nextDailyQueueNumber } from "@/lib/queue";
 import { getSlotCapacity, isDoctorScheduled } from "@/lib/schedule";
 import {
   getClinicWeekday,
@@ -37,6 +36,7 @@ const appointmentSchema = z
     patientName: z.string().min(1),
     patientAge: z.number().int().min(0),
     patientPhone: z.string().min(1),
+    queueNumber: z.number().int().positive().nullable().optional(),
     status: appointmentStatusSchema.optional(),
     note: z.string().optional(),
   })
@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
 
   const appointments = await prisma.appointment.findMany({
     where,
-    orderBy: [{ doctorId: "asc" }, { doctorQueueNumber: "asc" }],
+    orderBy: [{ doctorId: "asc" }, { appointmentDate: "asc" }, { createdAt: "asc" }],
     include: {
       doctor: {
         select: {
@@ -121,16 +121,18 @@ export async function POST(request: NextRequest) {
     patientName,
     patientAge,
     patientPhone,
+    queueNumber,
     status,
   } = parsed.data;
 
   const appointmentDate = normalizeDateToClinicMidnight(appointmentDateStr);
   const weekday = getClinicWeekday(appointmentDate);
-  const effectiveStatus = status ?? "WAITING";
+  const effectiveStatus = status ?? "BOOKED";
 
   try {
     const appointment = await prisma.$transaction(
       async (tx) => {
+      const { start: dayStart, end: dayEnd } = getClinicDayRange(appointmentDateStr);
       const doctor = await tx.doctor.findUnique({
         where: { id: doctorId },
         select: {
@@ -154,8 +156,11 @@ export async function POST(request: NextRequest) {
       }
 
       if (effectiveStatus !== "NO_SHOW") {
-        const capacity = getSlotCapacity(doctor, slot);
-        const { start: dayStart, end: dayEnd } = getClinicDayRange(appointmentDateStr);
+        const capacity = getSlotCapacity(
+          doctor,
+          slot,
+          scheduleParse.data[weekday]
+        );
         const bookedCount = await tx.appointment.count({
           where: {
             appointmentDate: { gte: dayStart, lt: dayEnd },
@@ -167,10 +172,16 @@ export async function POST(request: NextRequest) {
         if (bookedCount >= capacity) throw new Error("SLOT_FULL");
       }
 
-      const dailyQueueNumber = await nextDailyQueueNumber(tx, {
-        appointmentDate,
-      });
-      const doctorQueueNumber = dailyQueueNumber;
+      if (queueNumber !== undefined && queueNumber !== null) {
+        const queueConflict = await tx.appointment.findFirst({
+          where: {
+            appointmentDate: { gte: dayStart, lt: dayEnd },
+            OR: [{ dailyQueueNumber: queueNumber }, { doctorQueueNumber: queueNumber }],
+          },
+          select: { id: true },
+        });
+        if (queueConflict) throw new Error("QUEUE_NUMBER_TAKEN");
+      }
 
       return tx.appointment.create({
         data: {
@@ -182,8 +193,9 @@ export async function POST(request: NextRequest) {
           patientAge,
           patientPhone,
           status: effectiveStatus,
-          doctorQueueNumber,
-          dailyQueueNumber,
+          arrivedAt: effectiveStatus === "WAITING" ? new Date() : null,
+          doctorQueueNumber: queueNumber ?? null,
+          dailyQueueNumber: queueNumber ?? null,
         },
       });
       },
@@ -207,6 +219,9 @@ export async function POST(request: NextRequest) {
       }
       if (error.message === "SLOT_FULL") {
         return jsonError("Slot is full.", 409, "SLOT_FULL");
+      }
+      if (error.message === "QUEUE_NUMBER_TAKEN") {
+        return jsonError("Queue number is already used for this day.", 409, "QUEUE_NUMBER_TAKEN");
       }
       if (error.message === "SCHEDULE_INVALID") {
         return jsonError("Doctor schedule is invalid.", 500);

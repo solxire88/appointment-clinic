@@ -13,45 +13,26 @@ import Image from "next/image"
 import type { WeekDay, Locale } from "@/src/lib/types"
 import { WEEK_DAYS } from "@/src/lib/types"
 
+const ALL_TAB_ID = "all"
+
 const DAY_LABELS_FR: Record<WeekDay, string> = { mon: "Lun", tue: "Mar", wed: "Mer", thu: "Jeu", fri: "Ven", sat: "Sam", sun: "Dim" }
 const DAY_LABELS_AR: Record<WeekDay, string> = { mon: "\u0627\u062B\u0646", tue: "\u062B\u0644\u0627", wed: "\u0623\u0631\u0628", thu: "\u062E\u0645\u064A", fri: "\u062C\u0645\u0639", sat: "\u0633\u0628\u062A", sun: "\u0623\u062D\u062F" }
 
 function getScheduleSnippet(doc: Doctor, loc: Locale): string {
   const dayLabels = loc === "ar" ? DAY_LABELS_AR : DAY_LABELS_FR
-  const mLabel = loc === "ar" ? "\u0635" : "M"
-  const eLabel = loc === "ar" ? "\u0645" : "S"
-  const sep = loc === "ar" ? "\u0648" : "+"
-
-  // Group consecutive days with same pattern
-  const groups: { days: WeekDay[]; morning: boolean; evening: boolean }[] = []
-  for (const day of WEEK_DAYS) {
+  const activeDays = WEEK_DAYS.filter((day) => {
     const s = doc.schedule[day]
-    if (!s.morning && !s.evening) continue
-    const last = groups[groups.length - 1]
-    if (last && last.morning === s.morning && last.evening === s.evening) {
-      last.days.push(day)
-    } else {
-      groups.push({ days: [day], morning: s.morning, evening: s.evening })
-    }
-  }
+    return s.morning || s.evening
+  })
 
-  return groups.map((g) => {
-    const dayRange = g.days.length === 1
-      ? dayLabels[g.days[0]]
-      : `${dayLabels[g.days[0]]}-${dayLabels[g.days[g.days.length - 1]]}`
-    const slots = [
-      g.morning ? mLabel : "",
-      g.evening ? eLabel : "",
-    ].filter(Boolean).join(sep)
-    return `${dayRange}: ${slots}`
-  }).join(loc === "ar" ? " \u2022 " : " \u2022 ")
+  return activeDays.map((day) => dayLabels[day]).join(" \u2022 ")
 }
 
 export function DoctorsSection() {
   const { t, locale } = useI18n()
   const [doctors, setDoctors] = useState<Doctor[]>([])
   const [services, setServices] = useState<Service[]>([])
-  const [activeTab, setActiveTab] = useState<string>("")
+  const [activeTab, setActiveTab] = useState<string>(ALL_TAB_ID)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -59,22 +40,20 @@ export function DoctorsSection() {
     getServices().then(setServices)
   }, [])
 
-  // Set first tab with doctors as active
-  useEffect(() => {
-    if (services.length > 0 && doctors.length > 0 && !activeTab) {
-      const first = services.find((s) => doctors.some((d) => d.serviceId === s.id))
-      if (first) setActiveTab(first.id)
-    }
-  }, [services, doctors, activeTab])
-
-  const filteredDoctors = doctors.filter((d) => d.serviceId === activeTab)
+  const filteredDoctors =
+    activeTab === ALL_TAB_ID
+      ? doctors
+      : doctors.filter((d) => d.serviceId === activeTab)
   const tabServices = services.filter((s) => doctors.some((d) => d.serviceId === s.id))
+  const hasScrollableTrack = filteredDoctors.length > 3
 
   const scroll = useCallback((dir: "left" | "right") => {
     if (!scrollRef.current) return
-    const amount = 300
-    scrollRef.current.scrollBy({ left: dir === "left" ? -amount : amount, behavior: "smooth" })
-  }, [])
+    const amount = 320
+    const delta = dir === "left" ? -amount : amount
+    const signedDelta = locale === "ar" ? -delta : delta
+    scrollRef.current.scrollBy({ left: signedDelta, behavior: "smooth" })
+  }, [locale])
 
   const getDoctorName = (doc: Doctor) => locale === "ar" ? (doc.name_ar || doc.name_fr) : doc.name_fr
   const getDoctorTitle = (doc: Doctor) => locale === "ar" ? doc.title_ar : doc.title_fr
@@ -100,6 +79,16 @@ export function DoctorsSection() {
 
         {/* Tabs by service */}
         <div className="flex flex-wrap justify-center gap-2 mb-10">
+          <button
+            onClick={() => setActiveTab(ALL_TAB_ID)}
+            className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all ${
+              activeTab === ALL_TAB_ID
+                ? "bg-clinic-primary text-primary-foreground shadow-md"
+                : "bg-clinic-soft text-muted-foreground hover:bg-clinic-mint hover:text-foreground"
+            }`}
+          >
+            {locale === "ar" ? "\u0627\u0644\u0643\u0644" : "Tous"}
+          </button>
           {tabServices.map((svc) => {
             const isActive = svc.id === activeTab
             return (
@@ -119,14 +108,14 @@ export function DoctorsSection() {
         </div>
 
         {/* Carousel */}
-        <div className="relative">
+        <div className="relative max-w-6xl mx-auto">
           {/* Arrow buttons (desktop) */}
-          {filteredDoctors.length > 3 && (
+          {hasScrollableTrack && (
             <>
               <Button
                 variant="outline"
                 size="icon"
-                className="absolute -left-4 top-1/2 -translate-y-1/2 z-10 hidden md:flex rounded-full bg-card shadow-lg border-border text-foreground hover:bg-clinic-soft"
+                className="absolute -left-5 top-1/2 -translate-y-1/2 z-10 hidden md:flex rounded-full bg-card shadow-lg border-border text-foreground hover:bg-clinic-soft"
                 onClick={() => scroll("left")}
                 aria-label="Scroll left"
               >
@@ -135,7 +124,7 @@ export function DoctorsSection() {
               <Button
                 variant="outline"
                 size="icon"
-                className="absolute -right-4 top-1/2 -translate-y-1/2 z-10 hidden md:flex rounded-full bg-card shadow-lg border-border text-foreground hover:bg-clinic-soft"
+                className="absolute -right-5 top-1/2 -translate-y-1/2 z-10 hidden md:flex rounded-full bg-card shadow-lg border-border text-foreground hover:bg-clinic-soft"
                 onClick={() => scroll("right")}
                 aria-label="Scroll right"
               >
@@ -146,13 +135,15 @@ export function DoctorsSection() {
 
           <div
             ref={scrollRef}
-            className="flex gap-5 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide md:px-2"
+            className={`flex gap-5 pb-4 snap-x snap-mandatory scrollbar-hide px-2 sm:px-6 lg:px-20 overflow-x-auto ${
+              !hasScrollableTrack ? "md:justify-center md:overflow-visible" : ""
+            }`}
             style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
           >
             {filteredDoctors.map((doctor) => (
               <Card
                 key={doctor.id}
-                className="flex-shrink-0 w-[260px] sm:w-[280px] snap-start group hover:shadow-lg transition-all duration-300 border-border/50 hover:border-clinic-primary/30 overflow-hidden"
+                className="flex-shrink-0 w-[84%] sm:w-[62%] md:w-[42%] lg:w-[32%] xl:w-[28%] snap-center group hover:shadow-lg transition-all duration-300 border-border/50 hover:border-clinic-primary/30 overflow-hidden"
               >
                 <CardContent className="p-6 flex flex-col items-center text-center gap-4">
                   {/* Doctor photo or placeholder */}

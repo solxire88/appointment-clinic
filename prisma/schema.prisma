@@ -13,6 +13,7 @@ enum Slot {
 }
 
 enum AppointmentStatus {
+  BOOKED
   WAITING
   CALLED
   DONE
@@ -72,8 +73,9 @@ model Appointment {
   patientName      String
   patientAge       Int
   patientPhone     String
-  status           AppointmentStatus  @default(WAITING)
-  doctorQueueNumber Int
+  status           AppointmentStatus  @default(BOOKED)
+  arrivedAt        DateTime?
+  doctorQueueNumber Int?
   dailyQueueNumber  Int?
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt

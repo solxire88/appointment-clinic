@@ -12,6 +12,7 @@ export default function DisplayPage() {
 
     const mode = data?.mode ?? "IDLE"
     const queueNumber = data?.queueNumber ?? null
+    const patientName = data?.patientName ?? null
     const destination = data?.destination ?? null
 
     const [timeString, setTimeString] = useState("")
@@ -86,6 +87,7 @@ export default function DisplayPage() {
             <CallingOverlay
               visible={mode === "CALLING"}
               queueNumber={queueNumber ?? undefined}
+              patientName={patientName}
               serviceName={destination?.serviceName}
               doctorTitle={destination?.doctorTitle}
             />

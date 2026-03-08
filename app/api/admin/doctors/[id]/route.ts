@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import { jsonError } from "@/lib/api";
@@ -44,23 +45,39 @@ export async function PATCH(
   const parsed = doctorPatchSchema.safeParse(payload);
   if (!parsed.success) return jsonError("Invalid doctor data.", 400);
 
-  if (parsed.data.serviceId) {
-    const service = await prisma.service.findUnique({
-      where: { id: parsed.data.serviceId },
+  try {
+    if (parsed.data.serviceId) {
+      const service = await prisma.service.findUnique({
+        where: { id: parsed.data.serviceId },
+      });
+      if (!service) return jsonError("Service not found.", 404);
+    }
+
+    const doctor = await prisma.doctor.update({
+      where: { id },
+      data: {
+        ...parsed.data,
+        photoUrl:
+          parsed.data.photoUrl === "" ? null : parsed.data.photoUrl ?? undefined,
+      },
     });
-    if (!service) return jsonError("Service not found.", 404);
+
+    return NextResponse.json({ doctor });
+  } catch (error) {
+    console.error("[admin/doctors][PATCH] failed", error);
+    if (error instanceof Prisma.PrismaClientInitializationError) {
+      return jsonError("Database connection failed.", 500, "DB_CONNECTION_FAILED");
+    }
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2000") {
+        return jsonError("Photo URL is too long.", 400, "PHOTO_URL_TOO_LONG");
+      }
+      if (error.code === "P2025") {
+        return jsonError("Doctor not found.", 404, "NOT_FOUND");
+      }
+    }
+    return jsonError("Unable to update doctor.", 500);
   }
-
-  const doctor = await prisma.doctor.update({
-    where: { id },
-    data: {
-      ...parsed.data,
-      photoUrl:
-        parsed.data.photoUrl === "" ? null : parsed.data.photoUrl ?? undefined,
-    },
-  });
-
-  return NextResponse.json({ doctor });
 }
 
 export async function DELETE(

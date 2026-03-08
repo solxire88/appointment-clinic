@@ -43,9 +43,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Plus, Pencil, Trash2, AlertCircle } from "lucide-react"
+import { Plus, Pencil, Trash2, AlertCircle, Search } from "lucide-react"
 
 const statusColors: Record<AppointmentStatus, string> = {
+  BOOKED: "bg-slate-100 text-slate-800",
   WAITING: "bg-yellow-100 text-yellow-800",
   CALLED: "bg-blue-100 text-blue-800",
   DONE: "bg-clinic-mint text-clinic-deep",
@@ -53,6 +54,7 @@ const statusColors: Record<AppointmentStatus, string> = {
 }
 
 const statusKeys: Record<AppointmentStatus, string> = {
+  BOOKED: "status_booked",
   WAITING: "status_waiting",
   CALLED: "status_called",
   DONE: "status_done",
@@ -78,7 +80,7 @@ const emptyForm: AppointmentFormData = {
   patientName: "",
   patientAge: "",
   patientPhone: "",
-  status: "WAITING",
+  status: "BOOKED",
 }
 
 export default function AdminAppointmentsPage() {
@@ -90,6 +92,7 @@ export default function AdminAppointmentsPage() {
   const [filterService, setFilterService] = useState("")
   const [filterStatus, setFilterStatus] = useState("")
   const [filterSlot, setFilterSlot] = useState<AppointmentSlot | "all">("all")
+  const [searchQuery, setSearchQuery] = useState("")
 
   // CRUD dialog
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -122,6 +125,22 @@ export default function AdminAppointmentsPage() {
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  const normalizedSearch = searchQuery.trim().toLowerCase()
+  const normalizedSearchDigits = searchQuery.replace(/\D/g, "")
+  const filteredAppointments = appointments.filter((apt) => {
+    if (!normalizedSearch) return true
+
+    const patientName = apt.patientName.toLowerCase()
+    const phoneRaw = apt.patientPhone.toLowerCase()
+    const phoneDigits = apt.patientPhone.replace(/\D/g, "")
+
+    return (
+      patientName.includes(normalizedSearch) ||
+      phoneRaw.includes(normalizedSearch) ||
+      (normalizedSearchDigits.length > 0 && phoneDigits.includes(normalizedSearchDigits))
+    )
+  })
 
   // Load doctors for form when service changes
   useEffect(() => {
@@ -312,6 +331,7 @@ export default function AdminAppointmentsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">{t("admin_all")}</SelectItem>
+                    <SelectItem value="BOOKED">{t("status_booked")}</SelectItem>
                     <SelectItem value="WAITING">{t("status_waiting")}</SelectItem>
                     <SelectItem value="CALLED">{t("status_called")}</SelectItem>
                     <SelectItem value="DONE">{t("status_done")}</SelectItem>
@@ -319,6 +339,19 @@ export default function AdminAppointmentsPage() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            <div className="mt-4 relative max-w-md">
+              <Search className="absolute ltr:left-3 rtl:right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                className="ltr:pl-9 rtl:pr-9"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={
+                  locale === "ar"
+                    ? "بحث بالاسم أو رقم الهاتف"
+                    : "Rechercher par nom ou telephone"
+                }
+              />
             </div>
           </CardContent>
         </Card>
@@ -329,10 +362,10 @@ export default function AdminAppointmentsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>#</TableHead>
                   <TableHead>{t("appointment_date")}</TableHead>
                   <TableHead>{t("appointment_slot")}</TableHead>
                   <TableHead>{t("appointment_name")}</TableHead>
+                  <TableHead>{t("appointment_phone")}</TableHead>
                   <TableHead>{t("appointment_service")}</TableHead>
                   <TableHead className="hidden md:table-cell">{t("appointment_doctor")}</TableHead>
                   <TableHead>{t("admin_status")}</TableHead>
@@ -340,24 +373,24 @@ export default function AdminAppointmentsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {appointments.length === 0 ? (
+                {filteredAppointments.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                       {t("admin_no_data")}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  appointments.map((apt) => {
+                  filteredAppointments.map((apt) => {
                     const svc = serviceMap[apt.serviceId]
                     const doc = apt.doctorId ? doctorMap[apt.doctorId] : null
                     return (
                       <TableRow key={apt.id}>
-                        <TableCell className="font-medium text-foreground">{apt.queueNumber}</TableCell>
                         <TableCell className="text-muted-foreground">{apt.date}</TableCell>
                         <TableCell className="text-muted-foreground">
                           {apt.slot === "morning" ? t("appointment_morning") : t("appointment_evening")}
                         </TableCell>
                         <TableCell className="text-foreground">{apt.patientName}</TableCell>
+                        <TableCell className="text-muted-foreground">{apt.patientPhone}</TableCell>
                         <TableCell>
                           <Badge variant="secondary" className="bg-clinic-soft text-clinic-deep">
                             {svc ? (locale === "ar" ? svc.name_ar : svc.name_fr) : apt.serviceId}
@@ -377,6 +410,7 @@ export default function AdminAppointmentsPage() {
                               </Badge>
                             </SelectTrigger>
                             <SelectContent>
+                              <SelectItem value="BOOKED">{t("status_booked")}</SelectItem>
                               <SelectItem value="WAITING">{t("status_waiting")}</SelectItem>
                               <SelectItem value="CALLED">{t("status_called")}</SelectItem>
                               <SelectItem value="DONE">{t("status_done")}</SelectItem>
@@ -517,13 +551,14 @@ export default function AdminAppointmentsPage() {
                   <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as AppointmentStatus })}>
                     <SelectTrigger>
                       <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="WAITING">{t("status_waiting")}</SelectItem>
-                      <SelectItem value="CALLED">{t("status_called")}</SelectItem>
-                      <SelectItem value="DONE">{t("status_done")}</SelectItem>
-                      <SelectItem value="NO_SHOW">{t("status_no_show")}</SelectItem>
-                    </SelectContent>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="BOOKED">{t("status_booked")}</SelectItem>
+                    <SelectItem value="WAITING">{t("status_waiting")}</SelectItem>
+                    <SelectItem value="CALLED">{t("status_called")}</SelectItem>
+                    <SelectItem value="DONE">{t("status_done")}</SelectItem>
+                    <SelectItem value="NO_SHOW">{t("status_no_show")}</SelectItem>
+                  </SelectContent>
                   </Select>
                 </div>
               )}
@@ -549,8 +584,8 @@ export default function AdminAppointmentsPage() {
                 {deleteTarget && (
                   <>
                     {locale === "ar"
-                      ? `\u0647\u0644 \u062A\u0631\u064A\u062F \u062D\u0630\u0641 \u0645\u0648\u0639\u062F ${deleteTarget.patientName} (\u0631\u0642\u0645 ${deleteTarget.queueNumber})\u061F`
-                      : `Voulez-vous supprimer le rendez-vous de ${deleteTarget.patientName} (n\u00b0${deleteTarget.queueNumber}) ?`
+                      ? `\u0647\u0644 \u062A\u0631\u064A\u062F \u062D\u0630\u0641 \u0645\u0648\u0639\u062F ${deleteTarget.patientName}\u061F`
+                      : `Voulez-vous supprimer le rendez-vous de ${deleteTarget.patientName} ?`
                     }
                   </>
                 )}
