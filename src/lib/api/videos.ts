@@ -1,6 +1,8 @@
 import type { ApiVideo, ApiVideoPublic } from "@/src/types/api"
 import type { ClinicVideo } from "@/src/lib/types"
 import { apiClient } from "@/src/lib/apiClient"
+import { getAdminToken } from "@/src/lib/auth-storage"
+import { resolveApiUrl } from "@/src/lib/apiBase"
 import { mapVideoAdmin, mapVideoPublic } from "@/src/lib/api/mappers"
 
 export async function listVideos(): Promise<ClinicVideo[]> {
@@ -17,11 +19,13 @@ export async function addVideo(file: File, title?: string): Promise<ClinicVideo>
   const form = new FormData()
   form.append("file", file)
   if (title) form.append("title", title)
+  const token = getAdminToken()
 
-  const response = await fetch("/api/admin/videos/upload", {
+  const response = await fetch(resolveApiUrl("/api/admin/videos/upload"), {
     method: "POST",
     body: form,
-    credentials: "include",
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    credentials: "omit",
   })
 
   if (response.status === 401 && typeof window !== "undefined") {

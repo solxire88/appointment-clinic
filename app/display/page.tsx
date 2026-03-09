@@ -6,6 +6,7 @@ import { VideoPlayer } from "@/app/display/_components/VideoPlayer"
 import { CallingOverlay } from "@/app/display/_components/CallingOverlay"
 import { useDisplayPolling } from "@/app/display/_hooks/useDisplayPolling"
 import { BrandLogo } from "@/components/BrandLogo"
+import { resolveApiUrl } from "@/src/lib/apiBase"
 
 export default function DisplayPage() {
     const { data } = useDisplayPolling()
@@ -44,12 +45,12 @@ export default function DisplayPage() {
         let cancelled = false
         const loadVideos = async () => {
             try {
-                const response = await fetch("/api/videos")
+                const response = await fetch(resolveApiUrl("/api/videos"))
                 if (!response.ok) return
         const payload = (await response.json()) as { videos?: Array<{ url: string; sortOrder: number }> }
         const videos = payload.videos ?? []
         const ordered = [...videos].sort((a, b) => a.sortOrder - b.sortOrder)
-        const urls = ordered.map((video) => video.url).filter(Boolean)
+        const urls = ordered.map((video) => resolveApiUrl(video.url)).filter(Boolean)
         if (!cancelled) {
           setVideoSources(urls)
         }

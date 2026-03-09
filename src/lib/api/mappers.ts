@@ -17,6 +17,7 @@ import type {
   WeeklySchedule,
 } from "@/src/lib/types"
 import { DEFAULT_SCHEDULE, WEEK_DAYS } from "@/src/lib/types"
+import { resolveApiUrl } from "@/src/lib/apiBase"
 import { formatClinicDateFromIso } from "@/src/lib/utils/clinic-date"
 
 const DEFAULT_ICON = "activity"
@@ -127,7 +128,7 @@ export function mapVideoPublic(api: ApiVideoPublic): ClinicVideo {
   return {
     id: api.id,
     title: api.title,
-    src: api.url,
+    src: resolveApiUrl(api.url),
     enabled: true,
     order: api.sortOrder,
     createdAt: new Date().toISOString(),
@@ -138,7 +139,7 @@ export function mapVideoAdmin(api: ApiVideo): ClinicVideo {
   return {
     id: api.id,
     title: api.title,
-    src: `/api/videos/file/${api.id}`,
+    src: resolveApiUrl(`/api/videos/file/${api.id}`),
     enabled: api.enabled,
     order: api.sortOrder,
     createdAt: api.createdAt,

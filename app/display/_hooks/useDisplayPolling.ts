@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import { resolveApiUrl } from "@/src/lib/apiBase"
 
 export type DisplayMode = "IDLE" | "CALLING" | "OFF"
 
@@ -30,7 +31,7 @@ type ApiDisplayChanged = {
 const POLL_INTERVALS: Record<DisplayMode, number> = {
   IDLE: 10000,
   CALLING: 3000,
-  OFF: 10000,
+  OFF: 0,
 }
 
 export function useDisplayPolling() {
@@ -41,12 +42,10 @@ export function useDisplayPolling() {
 
   const poll = useCallback(async () => {
     if (!visibleRef.current) return
-    const headers: HeadersInit = {}
-    if (lastUpdatedRef.current) {
-      headers["If-Modified-Since"] = lastUpdatedRef.current
-    }
-
-    const response = await fetch("/api/display", { headers })
+    const since = lastUpdatedRef.current
+      ? `?since=${encodeURIComponent(lastUpdatedRef.current)}`
+      : ""
+    const response = await fetch(resolveApiUrl(`/api/display${since}`))
     if (response.status === 304) {
       return
     }

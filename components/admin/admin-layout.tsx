@@ -5,7 +5,7 @@ import React from "react"
 import { useEffect, useState } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { useI18n } from "@/src/lib/i18n/context"
-import { signOut, useSession } from "next-auth/react"
+import { getAdminSession, signOutAdmin } from "@/src/lib/api/auth"
 import { LanguageSwitcher } from "@/components/clinic/language-switcher"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
@@ -37,22 +37,33 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const [ready, setReady] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const { status } = useSession()
 
   useEffect(() => {
-    if (status === "unauthenticated") {
-      setReady(false)
-      router.replace("/admin/login")
-    }
-    if (status === "authenticated") {
-      setReady(true)
-    }
-  }, [router, status])
+    let mounted = true
+    getAdminSession()
+      .then((session) => {
+        if (!mounted) return
+        if (!session?.user) {
+          setReady(false)
+          router.replace("/admin/login")
+          return
+        }
+        setReady(true)
+      })
+      .catch(() => {
+        if (!mounted) return
+        setReady(false)
+        router.replace("/admin/login")
+      })
 
-  const handleLogout = () => {
-    signOut({ callbackUrl: "/admin/login" }).catch(() => {
-      router.push("/admin/login")
-    })
+    return () => {
+      mounted = false
+    }
+  }, [router])
+
+  const handleLogout = async () => {
+    await signOutAdmin()
+    router.push("/admin/login")
   }
 
   if (!ready) return null

@@ -1,4 +1,6 @@
 import type { ApiErrorPayload } from "@/src/types/api"
+import { clearAdminToken, getAdminToken } from "@/src/lib/auth-storage"
+import { resolveApiUrl } from "@/src/lib/apiBase"
 
 type ApiMethod = "GET" | "POST" | "PATCH" | "DELETE"
 
@@ -8,6 +10,7 @@ type RequestOptions = {
   headers?: HeadersInit
   redirectOn401?: boolean
   signal?: AbortSignal
+  skipAuth?: boolean
 }
 
 export class ApiError extends Error {
@@ -33,21 +36,26 @@ async function parseJsonSafe(response: Response) {
 }
 
 async function request<T>(url: string, options: RequestOptions = {}): Promise<T> {
-  const { method = "GET", body, headers, redirectOn401 = true, signal } = options
+  const { method = "GET", body, headers, redirectOn401 = true, signal, skipAuth = false } = options
+  const requestUrl = resolveApiUrl(url)
+  const token = skipAuth ? null : getAdminToken()
+  const isAdminRoute = url.startsWith("/api/admin")
 
-  const response = await fetch(url, {
+  const response = await fetch(requestUrl, {
     method,
     headers: {
       ...(body ? { "Content-Type": "application/json" } : {}),
+      ...(token && isAdminRoute ? { Authorization: `Bearer ${token}` } : {}),
       ...headers,
     },
     body: body ? JSON.stringify(body) : undefined,
-    credentials: "include",
+    credentials: "omit",
     signal,
   })
 
   if (response.status === 401 && redirectOn401 && typeof window !== "undefined") {
-    if (url.startsWith("/api/admin")) {
+    if (isAdminRoute) {
+      clearAdminToken()
       window.location.href = "/admin/login"
     }
   }
@@ -55,7 +63,7 @@ async function request<T>(url: string, options: RequestOptions = {}): Promise<T>
   if (!response.ok) {
     const payload = (await parseJsonSafe(response)) as ApiErrorPayload | null
     const message = payload?.error || response.statusText || "Request failed"
-    throw new ApiError(message, response.status, payload?.code, url)
+    throw new ApiError(message, response.status, payload?.code, requestUrl)
   }
 
   if (response.status === 204) {

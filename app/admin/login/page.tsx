@@ -5,8 +5,7 @@ import React from "react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useI18n } from "@/src/lib/i18n/context"
-import { signInAdmin } from "@/src/lib/api/auth"
-import { useSession } from "next-auth/react"
+import { getAdminSession, signInAdmin } from "@/src/lib/api/auth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -17,24 +16,30 @@ import { BrandLogo } from "@/components/BrandLogo"
 export default function AdminLoginPage() {
   const { t } = useI18n()
   const router = useRouter()
-  const { status } = useSession()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [error, setError] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (status === "authenticated") {
-      router.replace("/admin/dashboard")
+    let mounted = true
+    getAdminSession().then((session) => {
+      if (!mounted) return
+      if (session?.user) {
+        router.replace("/admin/dashboard")
+      }
+    })
+    return () => {
+      mounted = false
     }
-  }, [router, status])
+  }, [router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const ok = await signInAdmin(email, password)
-    if (ok) {
+    const result = await signInAdmin(email, password)
+    if (result.ok) {
       router.push("/admin/dashboard")
     } else {
-      setError(true)
+      setError(result.error || "Connexion impossible.")
     }
   }
 
@@ -56,7 +61,7 @@ export default function AdminLoginPage() {
                 id="admin-email"
                 type="email"
                 value={email}
-                onChange={(e) => { setEmail(e.target.value); setError(false) }}
+                onChange={(e) => { setEmail(e.target.value); setError(null) }}
                 required
               />
             </div>
@@ -66,12 +71,12 @@ export default function AdminLoginPage() {
                 id="admin-password"
                 type="password"
                 value={password}
-                onChange={(e) => { setPassword(e.target.value); setError(false) }}
+                onChange={(e) => { setPassword(e.target.value); setError(null) }}
                 required
               />
             </div>
             {error && (
-              <p className="text-sm text-destructive text-center">{t("validation_required")}</p>
+              <p className="text-sm text-destructive text-center">{error}</p>
             )}
             <Button type="submit" className="w-full bg-clinic-primary hover:bg-clinic-accent text-primary-foreground">
               {t("admin_login")}
